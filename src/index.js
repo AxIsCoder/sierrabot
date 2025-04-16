@@ -73,6 +73,70 @@ client.once(Events.ClientReady, c => {
 // Command interaction handler
 client.on(Events.InteractionCreate, async interaction => {
     try {
+        // Handle button interactions directly
+        if (interaction.isButton()) {
+            console.log(`Button clicked: ${interaction.customId} by ${interaction.user.tag} in ${interaction.guild.name}`);
+            
+            // Direct ticket button handler
+            if (interaction.customId === 'open_ticket' || interaction.customId === 'create_ticket') {
+                try {
+                    // Defer reply immediately to prevent "interaction failed" errors
+                    await interaction.reply({ 
+                        content: "Creating your ticket...", 
+                        ephemeral: true 
+                    });
+                    
+                    // Read the ticket configuration directly
+                    const configPath = path.join(__dirname, 'config', `ticket-config-${interaction.guild.id}.json`);
+                    
+                    if (!fs.existsSync(configPath)) {
+                        return await interaction.editReply({
+                            content: 'The ticket system is not configured for this server. Please ask an administrator to set it up.'
+                        });
+                    }
+                    
+                    // Read the configuration file
+                    const ticketConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+                    
+                    // Get the ticket manager utility
+                    const { createTicket, findExistingTicket } = require('./utils/ticketManager');
+                    
+                    // Check if user already has a ticket
+                    const existingTicket = await findExistingTicket(interaction.guild, interaction.user.id, ticketConfig.ticketCategoryId);
+                    
+                    if (existingTicket) {
+                        return await interaction.editReply({
+                            content: `You already have an open ticket: ${existingTicket}`
+                        });
+                    }
+                    
+                    // Create the ticket
+                    const ticket = await createTicket(interaction, ticketConfig);
+                    
+                    if (ticket) {
+                        await interaction.editReply({
+                            content: `Your ticket has been created: ${ticket}`
+                        });
+                    } else {
+                        await interaction.editReply({
+                            content: 'There was an error creating your ticket. Please try again later or contact an administrator.'
+                        });
+                    }
+                } catch (ticketError) {
+                    console.error('[ERROR] Error creating ticket:', ticketError);
+                    if (interaction.replied) {
+                        await interaction.editReply({
+                            content: 'There was an error processing your ticket request. Please try again later.'
+                        }).catch(console.error);
+                    }
+                }
+                return;
+            }
+            
+            // Defer to the regular event handling system for other buttons
+            return;
+        }
+        
         // Handle slash commands
         if (interaction.isChatInputCommand()) {
             // Get the command from the collection

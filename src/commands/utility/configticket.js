@@ -170,7 +170,7 @@ async function setupTicketSystem(interaction) {
         // Create a preview embed to show the configuration
         const previewEmbed = createEmbed({
             title: '✅ Ticket System Configured',
-            description: 'The ticket system has been configured successfully. Here\'s a preview of your ticket embed:',
+            description: 'The ticket system has been configured successfully. Use `/configticket send` to send the ticket embed to the channel.',
             fields: [
                 {
                     name: 'Channel',
@@ -188,7 +188,7 @@ async function setupTicketSystem(interaction) {
                     inline: false
                 }
             ],
-            footer: `Use /configticket send to send the ticket embed to ${channel.name}`,
+            footer: `Next step: Use /configticket send to send the embed to ${channel.name}`,
             timestamp: true
         });
         
@@ -197,13 +197,13 @@ async function setupTicketSystem(interaction) {
             title: ticketConfig.embed.title,
             description: ticketConfig.embed.description,
             color: ticketConfig.embed.color,
-            footer: 'This is a preview of the ticket embed',
+            footer: '👆 This is how your ticket embed will look (button not shown in preview)',
             timestamp: true
         });
         
         // Reply with success message and preview
         await interaction.editReply({
-            content: `✅ Ticket system configured successfully! The ticket embed will appear in ${channel}.`,
+            content: `✅ Ticket system configured successfully! Use \`/configticket send\` to send the embed to ${channel}.`,
             embeds: [previewEmbed, ticketPreviewEmbed]
         });
     } catch (error) {

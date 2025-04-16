@@ -546,5 +546,7 @@ async function createTicket(interaction, config) {
 module.exports = {
     handleTicketButtonInteraction,
     handleCloseTicketInteraction,
-    handleTranscriptInteraction
+    handleTranscriptInteraction,
+    createTicket,
+    findExistingTicket
 }; 
