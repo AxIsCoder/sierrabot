@@ -1,4 +1,4 @@
-const { PermissionsBitField, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType } = require('discord.js');
+const { PermissionsBitField, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, AttachmentBuilder } = require('discord.js');
 const { createEmbed } = require('./embedCreator');
 const fs = require('fs');
 const path = require('path');
@@ -66,6 +66,370 @@ async function handleTicketButtonInteraction(interaction) {
             console.error('Failed to reply with error message:', replyError);
         }
     }
+}
+
+/**
+ * Handle when a user or staff member clicks the close ticket button
+ * @param {Object} interaction - The button interaction
+ * @returns {Promise<void>}
+ */
+async function handleCloseTicketInteraction(interaction) {
+    try {
+        await interaction.deferReply({ ephemeral: true });
+        
+        // Check if the channel is a ticket
+        const channel = interaction.channel;
+        if (!channel.name.startsWith('ticket-')) {
+            return await interaction.editReply({
+                content: 'This command can only be used in ticket channels.',
+                ephemeral: true
+            });
+        }
+        
+        // Get the ticket number from the channel name
+        const ticketNumber = channel.name.replace('ticket-', '');
+        
+        // Confirm before closing
+        const confirmEmbed = createEmbed({
+            title: 'Close Ticket',
+            description: `Are you sure you want to close this ticket? This will archive the ticket and make it read-only.`,
+            color: '#f0ad4e', // Warning color
+            footer: `Ticket #${ticketNumber}`,
+            timestamp: true
+        });
+        
+        const confirmButtons = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('confirm_close')
+                .setLabel('Close Ticket')
+                .setStyle(ButtonStyle.Danger),
+            new ButtonBuilder()
+                .setCustomId('cancel_close')
+                .setLabel('Cancel')
+                .setStyle(ButtonStyle.Secondary)
+        );
+        
+        const confirmMessage = await interaction.editReply({
+            embeds: [confirmEmbed],
+            components: [confirmButtons],
+            ephemeral: true
+        });
+        
+        // Wait for confirmation response
+        try {
+            const confirmation = await confirmMessage.awaitMessageComponent({
+                filter: i => i.user.id === interaction.user.id,
+                time: 60000 // 1 minute to confirm
+            });
+            
+            if (confirmation.customId === 'cancel_close') {
+                return await confirmation.update({
+                    content: 'Ticket close cancelled.',
+                    embeds: [],
+                    components: [],
+                    ephemeral: true
+                });
+            }
+            
+            // If confirmed, close the ticket
+            await confirmation.update({
+                content: 'Closing ticket...',
+                embeds: [],
+                components: [],
+                ephemeral: true
+            });
+            
+            // Generate the transcript first
+            const transcript = await generateTranscript(interaction.channel);
+            
+            // Find the user who opened the ticket to send them the transcript
+            const userId = getUserIdFromTicket(channel);
+            let ticketCreator = null;
+            
+            if (userId) {
+                ticketCreator = await interaction.client.users.fetch(userId).catch(() => null);
+            }
+            
+            // Send transcript to the ticket creator if found
+            if (ticketCreator) {
+                try {
+                    const dmEmbed = createEmbed({
+                        title: `Ticket Transcript #${ticketNumber}`,
+                        description: `Your support ticket in ${interaction.guild.name} has been closed. Here is the transcript for your reference.`,
+                        fields: [
+                            {
+                                name: 'Server',
+                                value: interaction.guild.name,
+                                inline: true
+                            },
+                            {
+                                name: 'Ticket Number',
+                                value: `#${ticketNumber}`,
+                                inline: true
+                            },
+                            {
+                                name: 'Closed By',
+                                value: interaction.user.tag,
+                                inline: true
+                            },
+                            {
+                                name: 'Closed At',
+                                value: `<t:${Math.floor(Date.now() / 1000)}:F>`,
+                                inline: false
+                            }
+                        ],
+                        footer: 'Thank you for contacting support',
+                        timestamp: true
+                    });
+                    
+                    await ticketCreator.send({
+                        embeds: [dmEmbed],
+                        files: [transcript]
+                    });
+                } catch (dmError) {
+                    console.error('Failed to send transcript to user:', dmError);
+                    // Continue with closing the ticket even if DM fails
+                }
+            }
+            
+            // Notify the channel that the ticket is being closed
+            const closingEmbed = createEmbed({
+                title: 'Ticket Closed',
+                description: `This ticket has been closed by ${interaction.user}.`,
+                fields: [
+                    {
+                        name: 'Ticket Number',
+                        value: `#${ticketNumber}`,
+                        inline: true
+                    },
+                    {
+                        name: 'Closed At',
+                        value: `<t:${Math.floor(Date.now() / 1000)}:F>`,
+                        inline: true
+                    }
+                ],
+                footer: 'This channel will be deleted in 5 seconds',
+                timestamp: true
+            });
+            
+            // Send the transcript to the channel as well
+            await channel.send({
+                embeds: [closingEmbed],
+                files: [transcript]
+            });
+            
+            // Remove all permissions except for staff
+            try {
+                // First make the channel read-only for the ticket creator
+                if (userId) {
+                    await channel.permissionOverwrites.edit(userId, {
+                        SendMessages: false,
+                        AddReactions: false
+                    });
+                }
+                
+                // After a delay, delete the channel
+                setTimeout(async () => {
+                    try {
+                        await channel.delete(`Ticket #${ticketNumber} closed by ${interaction.user.tag}`);
+                    } catch (deleteError) {
+                        console.error(`Failed to delete ticket channel: ${deleteError}`);
+                    }
+                }, 5000); // 5 second delay
+            } catch (permError) {
+                console.error(`Failed to update permissions: ${permError}`);
+            }
+        } catch (awaitError) {
+            // If the user doesn't respond within time limit
+            console.error('No confirmation received:', awaitError);
+            await interaction.editReply({
+                content: 'Ticket close cancelled due to timeout.',
+                embeds: [],
+                components: [],
+                ephemeral: true
+            });
+        }
+    } catch (error) {
+        console.error('Error handling close ticket interaction:', error);
+        try {
+            if (interaction.deferred) {
+                await interaction.editReply({
+                    content: 'There was an error closing the ticket. Please try again later.',
+                    ephemeral: true
+                });
+            } else {
+                await interaction.reply({
+                    content: 'There was an error closing the ticket. Please try again later.',
+                    ephemeral: true
+                });
+            }
+        } catch (replyError) {
+            console.error('Failed to reply with error message:', replyError);
+        }
+    }
+}
+
+/**
+ * Handle when a user or staff member clicks the transcript button
+ * @param {Object} interaction - The button interaction
+ * @returns {Promise<void>}
+ */
+async function handleTranscriptInteraction(interaction) {
+    try {
+        await interaction.deferReply({ ephemeral: true });
+        
+        // Check if the channel is a ticket
+        const channel = interaction.channel;
+        if (!channel.name.startsWith('ticket-')) {
+            return await interaction.editReply({
+                content: 'This command can only be used in ticket channels.',
+                ephemeral: true
+            });
+        }
+        
+        // Get the ticket number from the channel name
+        const ticketNumber = channel.name.replace('ticket-', '');
+        
+        // Generate transcript
+        const transcript = await generateTranscript(channel);
+        
+        // Create an embed for the transcript
+        const transcriptEmbed = createEmbed({
+            title: `Ticket Transcript #${ticketNumber}`,
+            description: `Here is the transcript for this ticket as requested by ${interaction.user}.`,
+            fields: [
+                {
+                    name: 'Ticket Number',
+                    value: `#${ticketNumber}`,
+                    inline: true
+                },
+                {
+                    name: 'Generated At',
+                    value: `<t:${Math.floor(Date.now() / 1000)}:F>`,
+                    inline: true
+                },
+                {
+                    name: 'Generated By',
+                    value: interaction.user.tag,
+                    inline: true
+                }
+            ],
+            footer: 'This transcript contains all messages in this ticket channel',
+            timestamp: true
+        });
+        
+        // Send the transcript
+        await interaction.editReply({
+            embeds: [transcriptEmbed],
+            files: [transcript],
+            ephemeral: true
+        });
+        
+        // Also send to the channel
+        await channel.send({
+            content: `${interaction.user} generated a transcript of this ticket.`,
+            files: [transcript]
+        });
+    } catch (error) {
+        console.error('Error handling transcript interaction:', error);
+        try {
+            if (interaction.deferred) {
+                await interaction.editReply({
+                    content: 'There was an error generating the transcript. Please try again later.',
+                    ephemeral: true
+                });
+            } else {
+                await interaction.reply({
+                    content: 'There was an error generating the transcript. Please try again later.',
+                    ephemeral: true
+                });
+            }
+        } catch (replyError) {
+            console.error('Failed to reply with error message:', replyError);
+        }
+    }
+}
+
+/**
+ * Generate a transcript of a ticket channel
+ * @param {Object} channel - The channel to generate a transcript for
+ * @returns {Promise<AttachmentBuilder>} - The transcript file
+ */
+async function generateTranscript(channel) {
+    // Get the ticket number from the channel name
+    const ticketNumber = channel.name.replace('ticket-', '');
+    
+    try {
+        // Fetch up to 500 messages (Discord API limit per request)
+        // For very long tickets, we'd need pagination, but this is sufficient for most cases
+        const messages = await channel.messages.fetch({ limit: 100 });
+        
+        // Sort messages by timestamp (oldest first)
+        const sortedMessages = Array.from(messages.values()).sort((a, b) => a.createdTimestamp - b.createdTimestamp);
+        
+        // Format the transcript
+        let transcriptContent = `# Ticket Transcript #${ticketNumber}\n`;
+        transcriptContent += `Server: ${channel.guild.name}\n`;
+        transcriptContent += `Channel: ${channel.name}\n`;
+        transcriptContent += `Date: ${new Date().toISOString()}\n\n`;
+        
+        // Add each message to the transcript
+        for (const message of sortedMessages) {
+            const timestamp = new Date(message.createdTimestamp).toISOString();
+            const author = message.author.tag + (message.author.bot ? ' [BOT]' : '');
+            
+            transcriptContent += `[${timestamp}] ${author}: ${message.content}\n`;
+            
+            // Add attachments
+            if (message.attachments.size > 0) {
+                transcriptContent += `Attachments:\n`;
+                message.attachments.forEach(attachment => {
+                    transcriptContent += `- ${attachment.name}: ${attachment.url}\n`;
+                });
+            }
+            
+            // Add embeds (simplified)
+            if (message.embeds.length > 0) {
+                transcriptContent += `Embeds: ${message.embeds.length}\n`;
+                message.embeds.forEach(embed => {
+                    if (embed.title) transcriptContent += `- Title: ${embed.title}\n`;
+                    if (embed.description) transcriptContent += `- Description: ${embed.description}\n`;
+                });
+            }
+            
+            transcriptContent += `\n`;
+        }
+        
+        // Create the file attachment
+        return new AttachmentBuilder(
+            Buffer.from(transcriptContent, 'utf-8'), 
+            { name: `ticket-${ticketNumber}-transcript.txt` }
+        );
+    } catch (error) {
+        console.error('Error generating transcript:', error);
+        // Return a simple error transcript if something goes wrong
+        const errorContent = `Failed to generate complete transcript for ticket #${ticketNumber}. Error: ${error.message}`;
+        return new AttachmentBuilder(
+            Buffer.from(errorContent, 'utf-8'), 
+            { name: `ticket-${ticketNumber}-transcript-error.txt` }
+        );
+    }
+}
+
+/**
+ * Extract user ID from ticket channel topic
+ * @param {Object} channel - The ticket channel
+ * @returns {string|null} - The user ID or null if not found
+ */
+function getUserIdFromTicket(channel) {
+    if (!channel.topic) return null;
+    
+    const userIdMatch = channel.topic.match(/User ID: (\d+)/);
+    if (userIdMatch && userIdMatch[1]) {
+        return userIdMatch[1];
+    }
+    
+    return null;
 }
 
 /**
@@ -185,5 +549,7 @@ async function createTicket(interaction, config) {
 }
 
 module.exports = {
-    handleTicketButtonInteraction
+    handleTicketButtonInteraction,
+    handleCloseTicketInteraction,
+    handleTranscriptInteraction
 }; 

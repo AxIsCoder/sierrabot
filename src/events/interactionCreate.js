@@ -1,5 +1,5 @@
 const { Events, InteractionType } = require('discord.js');
-const { handleTicketButtonInteraction } = require('../utils/ticketManager');
+const { handleTicketButtonInteraction, handleCloseTicketInteraction, handleTranscriptInteraction } = require('../utils/ticketManager');
 
 module.exports = {
     name: Events.InteractionCreate,
@@ -16,21 +16,20 @@ module.exports = {
                     
                     // Handle ticket close button
                     if (interaction.customId === 'close_ticket') {
-                        // This will be implemented later for ticket closing
-                        await interaction.reply({ 
-                            content: 'This feature is coming soon!', 
-                            ephemeral: true 
-                        });
+                        await handleCloseTicketInteraction(interaction);
                         return;
                     }
                     
                     // Handle transcript button
                     if (interaction.customId === 'transcript_ticket') {
-                        // This will be implemented later for ticket transcripts
-                        await interaction.reply({ 
-                            content: 'This feature is coming soon!', 
-                            ephemeral: true 
-                        });
+                        await handleTranscriptInteraction(interaction);
+                        return;
+                    }
+                    
+                    // Handle confirmation buttons for closing tickets
+                    if (interaction.customId === 'confirm_close' || interaction.customId === 'cancel_close') {
+                        // These are handled in the handleCloseTicketInteraction function
+                        // No need to respond here as they're handled by awaitMessageComponent
                         return;
                     }
                     
