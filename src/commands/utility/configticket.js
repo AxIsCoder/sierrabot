@@ -90,7 +90,7 @@ module.exports = {
 };
 
 async function setupTicketSystem(interaction) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: 64 });
     
     try {
         const channel = interaction.options.getChannel('channel');
@@ -215,7 +215,7 @@ async function setupTicketSystem(interaction) {
 }
 
 async function sendTicketEmbed(interaction) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: 64 });
     
     try {
         // Check if the ticket system has been configured
@@ -300,7 +300,7 @@ async function sendTicketEmbed(interaction) {
 }
 
 async function addSupportRole(interaction) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: 64 });
     
     try {
         const role = interaction.options.getRole('role');
@@ -381,7 +381,7 @@ async function addSupportRole(interaction) {
 }
 
 async function removeSupportRole(interaction) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: 64 });
     
     try {
         const role = interaction.options.getRole('role');
@@ -469,7 +469,7 @@ async function removeSupportRole(interaction) {
 }
 
 async function listSupportRoles(interaction) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: 64 });
     
     try {
         // Get the configuration file path

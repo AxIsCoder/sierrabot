@@ -11,8 +11,10 @@ const path = require('path');
 async function handleTicketButtonInteraction(interaction) {
     try {
         // First acknowledge the interaction to prevent timeouts
-        await interaction.deferReply({ 
-            ephemeral: true 
+        // Important: We have to respond within 3 seconds to avoid the "interaction failed" error
+        await interaction.reply({ 
+            content: "Creating your ticket...", 
+            flags: 64  // Using flags value for ephemeral (64 = 1 << 6, EPHEMERAL flag)
         });
         
         // Check if the ticket system is configured for this guild
@@ -48,16 +50,20 @@ async function handleTicketButtonInteraction(interaction) {
     } catch (error) {
         console.error('Error handling ticket button interaction:', error);
         
-        // Handle the case where interaction might not be deferred yet
+        // Handle the case where interaction might not be replied yet
         try {
-            if (interaction.deferred) {
+            if (interaction.replied) {
+                return await interaction.editReply({
+                    content: 'There was an error creating your ticket. Please try again later or contact an administrator.'
+                });
+            } else if (interaction.deferred) {
                 return await interaction.editReply({
                     content: 'There was an error creating your ticket. Please try again later or contact an administrator.'
                 });
             } else {
                 return await interaction.reply({
                     content: 'There was an error creating your ticket. Please try again later or contact an administrator.',
-                    ephemeral: true
+                    flags: 64  // Using flags value for ephemeral
                 });
             }
         } catch (replyError) {
@@ -73,14 +79,16 @@ async function handleTicketButtonInteraction(interaction) {
  */
 async function handleCloseTicketInteraction(interaction) {
     try {
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.reply({ 
+            content: "Processing your request...", 
+            flags: 64  // Using flags value for ephemeral
+        });
         
         // Check if the channel is a ticket
         const channel = interaction.channel;
         if (!channel.name.startsWith('ticket-')) {
             return await interaction.editReply({
-                content: 'This command can only be used in ticket channels.',
-                ephemeral: true
+                content: 'This command can only be used in ticket channels.'
             });
         }
         
@@ -107,34 +115,36 @@ async function handleCloseTicketInteraction(interaction) {
                 .setStyle(ButtonStyle.Secondary)
         );
         
+        // Edit the original reply with the confirmation message
         const confirmMessage = await interaction.editReply({
+            content: null,
             embeds: [confirmEmbed],
-            components: [confirmButtons],
-            ephemeral: true
+            components: [confirmButtons]
         });
         
         // Wait for confirmation response
         try {
-            const confirmation = await confirmMessage.awaitMessageComponent({
-                filter: i => i.user.id === interaction.user.id,
+            const confirmation = await interaction.channel.awaitMessageComponent({
+                filter: i => (i.customId === 'confirm_close' || i.customId === 'cancel_close') && i.user.id === interaction.user.id,
                 time: 60000 // 1 minute to confirm
             });
             
+            // First acknowledge the confirmation interaction
+            await confirmation.deferUpdate();
+            
             if (confirmation.customId === 'cancel_close') {
-                return await confirmation.update({
+                return await interaction.editReply({
                     content: 'Ticket close cancelled.',
                     embeds: [],
-                    components: [],
-                    ephemeral: true
+                    components: []
                 });
             }
             
             // If confirmed, close the ticket
-            await confirmation.update({
+            await interaction.editReply({
                 content: 'Closing ticket...',
                 embeds: [],
-                components: [],
-                ephemeral: true
+                components: []
             });
             
             // Generate the transcript first
@@ -243,22 +253,20 @@ async function handleCloseTicketInteraction(interaction) {
             await interaction.editReply({
                 content: 'Ticket close cancelled due to timeout.',
                 embeds: [],
-                components: [],
-                ephemeral: true
+                components: []
             });
         }
     } catch (error) {
         console.error('Error handling close ticket interaction:', error);
         try {
-            if (interaction.deferred) {
+            if (interaction.replied) {
                 await interaction.editReply({
-                    content: 'There was an error closing the ticket. Please try again later.',
-                    ephemeral: true
+                    content: 'There was an error closing the ticket. Please try again later.'
                 });
             } else {
                 await interaction.reply({
                     content: 'There was an error closing the ticket. Please try again later.',
-                    ephemeral: true
+                    flags: 64  // Using flags value for ephemeral
                 });
             }
         } catch (replyError) {
@@ -274,14 +282,16 @@ async function handleCloseTicketInteraction(interaction) {
  */
 async function handleTranscriptInteraction(interaction) {
     try {
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.reply({ 
+            content: "Generating transcript...", 
+            flags: 64  // Using flags value for ephemeral
+        });
         
         // Check if the channel is a ticket
         const channel = interaction.channel;
         if (!channel.name.startsWith('ticket-')) {
             return await interaction.editReply({
-                content: 'This command can only be used in ticket channels.',
-                ephemeral: true
+                content: 'This command can only be used in ticket channels.'
             });
         }
         
@@ -318,9 +328,9 @@ async function handleTranscriptInteraction(interaction) {
         
         // Send the transcript
         await interaction.editReply({
+            content: null,
             embeds: [transcriptEmbed],
-            files: [transcript],
-            ephemeral: true
+            files: [transcript]
         });
         
         // Also send to the channel
@@ -331,15 +341,14 @@ async function handleTranscriptInteraction(interaction) {
     } catch (error) {
         console.error('Error handling transcript interaction:', error);
         try {
-            if (interaction.deferred) {
+            if (interaction.replied) {
                 await interaction.editReply({
-                    content: 'There was an error generating the transcript. Please try again later.',
-                    ephemeral: true
+                    content: 'There was an error generating the transcript. Please try again later.'
                 });
             } else {
                 await interaction.reply({
                     content: 'There was an error generating the transcript. Please try again later.',
-                    ephemeral: true
+                    flags: 64  // Using flags value for ephemeral
                 });
             }
         } catch (replyError) {

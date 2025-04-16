@@ -8,6 +8,9 @@ module.exports = {
             // Handle button interactions
             if (interaction.isButton()) {
                 try {
+                    // Log interaction details for debugging
+                    console.log(`Button interaction: ${interaction.customId} by ${interaction.user.tag}`);
+                    
                     // Handle ticket creation button
                     if (interaction.customId === 'create_ticket') {
                         await handleTicketButtonInteraction(interaction);
@@ -28,8 +31,11 @@ module.exports = {
                     
                     // Handle confirmation buttons for closing tickets
                     if (interaction.customId === 'confirm_close' || interaction.customId === 'cancel_close') {
-                        // These are handled in the handleCloseTicketInteraction function
-                        // No need to respond here as they're handled by awaitMessageComponent
+                        // These are handled in the handleCloseTicketInteraction function by awaitMessageComponent
+                        // We just need to acknowledge the interaction to avoid interaction failed errors
+                        if (!interaction.replied && !interaction.deferred) {
+                            await interaction.deferUpdate().catch(console.error);
+                        }
                         return;
                     }
                     
@@ -37,7 +43,7 @@ module.exports = {
                     if (!interaction.replied && !interaction.deferred) {
                         await interaction.reply({ 
                             content: 'This button action is not recognized.', 
-                            ephemeral: true 
+                            flags: 64 // ephemeral flag value
                         });
                     }
                 } catch (buttonError) {
@@ -47,7 +53,7 @@ module.exports = {
                         if (!interaction.replied && !interaction.deferred) {
                             await interaction.reply({ 
                                 content: 'An error occurred while processing this button. Please try again later.', 
-                                ephemeral: true 
+                                flags: 64 // ephemeral flag value  
                             });
                         } else if (interaction.deferred) {
                             await interaction.editReply({ 
@@ -79,7 +85,7 @@ module.exports = {
                     try {
                         const errorReply = {
                             content: 'There was an error while executing this command!',
-                            ephemeral: true
+                            flags: 64 // ephemeral flag value
                         };
                         
                         if (interaction.replied || interaction.deferred) {
