@@ -18,9 +18,6 @@ A modern Discord bot with beautiful Discord-themed embeds that blend perfectly w
 ### 🎮 Fun Commands
 - **8ball** - Ask the Magic 8-Ball questions with color-coded responses
 
-## Screenshots
-
-(Add your screenshots here after getting them from the bot in action)
 
 ## Prerequisites
 
