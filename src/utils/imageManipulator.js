@@ -2,6 +2,7 @@ const Jimp = require('jimp');
 const fs = require('fs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
+const axios = require('axios');
 
 /**
  * Apply distortion effects to an image
@@ -17,11 +18,25 @@ async function distortImage(imageUrl, effect = 'random') {
             fs.mkdirSync(outputDir, { recursive: true });
         }
         
-        // Generate unique filename
+        // Generate unique filenames
+        const tempImagePath = path.join(outputDir, `original-${uuidv4()}.png`);
         const outputPath = path.join(outputDir, `distort-${uuidv4()}.png`);
         
-        // Read the image
-        const image = await Jimp.read(imageUrl);
+        // Download the image first
+        const response = await axios({
+            url: imageUrl,
+            method: 'GET',
+            responseType: 'arraybuffer'
+        });
+        
+        // Save the downloaded image
+        fs.writeFileSync(tempImagePath, Buffer.from(response.data));
+        
+        // Read the image using Jimp
+        const image = await Jimp.read(tempImagePath);
+        
+        // Delete the temporary original image
+        fs.unlinkSync(tempImagePath);
         
         // Choose effect if random
         if (effect === 'random') {
