@@ -24,8 +24,16 @@ module.exports = {
                         .addChannelTypes(ChannelType.GuildCategory))
                 .addRoleOption(option => 
                     option.setName('support_role')
-                        .setDescription('The role that can see and respond to tickets')
+                        .setDescription('Primary support role that can see and respond to tickets')
                         .setRequired(true))
+                .addRoleOption(option => 
+                    option.setName('support_role_2')
+                        .setDescription('Additional support role (optional)')
+                        .setRequired(false))
+                .addRoleOption(option => 
+                    option.setName('support_role_3')
+                        .setDescription('Additional support role (optional)')
+                        .setRequired(false))
                 .addStringOption(option => 
                     option.setName('title')
                         .setDescription('The title of the ticket embed')
@@ -42,6 +50,26 @@ module.exports = {
             subcommand
                 .setName('send')
                 .setDescription('Send the ticket embed to the configured channel'))
+        .addSubcommand(subcommand => 
+            subcommand
+                .setName('addrole')
+                .setDescription('Add an additional support role')
+                .addRoleOption(option => 
+                    option.setName('role')
+                        .setDescription('The support role to add')
+                        .setRequired(true)))
+        .addSubcommand(subcommand => 
+            subcommand
+                .setName('removerole')
+                .setDescription('Remove a support role')
+                .addRoleOption(option => 
+                    option.setName('role')
+                        .setDescription('The support role to remove')
+                        .setRequired(true)))
+        .addSubcommand(subcommand => 
+            subcommand
+                .setName('listroles')
+                .setDescription('List all configured support roles'))
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
     category: CATEGORIES.UTILITY,
     async execute(interaction) {
@@ -51,6 +79,12 @@ module.exports = {
             await setupTicketSystem(interaction);
         } else if (subcommand === 'send') {
             await sendTicketEmbed(interaction);
+        } else if (subcommand === 'addrole') {
+            await addSupportRole(interaction);
+        } else if (subcommand === 'removerole') {
+            await removeSupportRole(interaction);
+        } else if (subcommand === 'listroles') {
+            await listSupportRoles(interaction);
         }
     }
 };
@@ -62,6 +96,8 @@ async function setupTicketSystem(interaction) {
         const channel = interaction.options.getChannel('channel');
         const ticketCategory = interaction.options.getChannel('ticket_category');
         const supportRole = interaction.options.getRole('support_role');
+        const supportRole2 = interaction.options.getRole('support_role_2');
+        const supportRole3 = interaction.options.getRole('support_role_3');
         const title = interaction.options.getString('title') || 'Support Tickets';
         const description = interaction.options.getString('description') || 
             'Click the button below to open a support ticket. Our team will assist you as soon as possible.';
@@ -70,16 +106,14 @@ async function setupTicketSystem(interaction) {
         // Validate that the provided channel is a text channel
         if (channel.type !== ChannelType.GuildText) {
             return await interaction.editReply({ 
-                content: 'Please select a text channel for the ticket embed.',
-                ephemeral: true 
+                content: 'Please select a text channel for the ticket embed.'
             });
         }
         
         // Validate that the provided category is a category channel
         if (ticketCategory.type !== ChannelType.GuildCategory) {
             return await interaction.editReply({ 
-                content: 'Please select a category channel for the tickets.',
-                ephemeral: true 
+                content: 'Please select a category channel for the tickets.'
             });
         }
         
@@ -87,6 +121,15 @@ async function setupTicketSystem(interaction) {
         const configDir = path.join(__dirname, '..', '..', 'config');
         if (!fs.existsSync(configDir)) {
             fs.mkdirSync(configDir, { recursive: true });
+        }
+        
+        // Collect support roles (removing duplicates and nulls)
+        const supportRoles = [supportRole];
+        if (supportRole2 && !supportRoles.some(role => role.id === supportRole2.id)) {
+            supportRoles.push(supportRole2);
+        }
+        if (supportRole3 && !supportRoles.some(role => role.id === supportRole3.id)) {
+            supportRoles.push(supportRole3);
         }
         
         // Check if there's an existing config to preserve the lastTicketId
@@ -101,12 +144,12 @@ async function setupTicketSystem(interaction) {
             }
         }
         
-        // Save the ticket configuration
+        // Save the ticket configuration with multiple support roles
         const ticketConfig = {
             guildId: interaction.guild.id,
             channelId: channel.id,
             ticketCategoryId: ticketCategory.id,
-            supportRoleId: supportRole.id,
+            supportRoleIds: supportRoles.map(role => role.id),
             embed: {
                 title: title,
                 description: description,
@@ -120,6 +163,9 @@ async function setupTicketSystem(interaction) {
             configPath,
             JSON.stringify(ticketConfig, null, 2)
         );
+        
+        // Build roles string for display
+        const rolesString = supportRoles.map(role => `${role}`).join(', ');
         
         // Create a preview embed to show the configuration
         const previewEmbed = createEmbed({
@@ -137,9 +183,9 @@ async function setupTicketSystem(interaction) {
                     inline: true
                 },
                 {
-                    name: 'Support Role',
-                    value: `${supportRole}`,
-                    inline: true
+                    name: 'Support Roles',
+                    value: rolesString,
+                    inline: false
                 }
             ],
             footer: `Use /configticket send to send the ticket embed to ${channel.name}`,
@@ -158,14 +204,12 @@ async function setupTicketSystem(interaction) {
         // Reply with success message and preview
         await interaction.editReply({
             content: `✅ Ticket system configured successfully! The ticket embed will appear in ${channel}.`,
-            embeds: [previewEmbed, ticketPreviewEmbed],
-            ephemeral: true
+            embeds: [previewEmbed, ticketPreviewEmbed]
         });
     } catch (error) {
         console.error('Error configuring ticket system:', error);
         await interaction.editReply({
-            content: 'There was an error configuring the ticket system. Please try again later.',
-            ephemeral: true
+            content: 'There was an error configuring the ticket system. Please try again later.'
         });
     }
 }
@@ -251,6 +295,252 @@ async function sendTicketEmbed(interaction) {
         console.error('Error sending ticket embed:', error);
         await interaction.editReply({
             content: 'There was an error sending the ticket embed. Please try again later.'
+        });
+    }
+}
+
+async function addSupportRole(interaction) {
+    await interaction.deferReply({ ephemeral: true });
+    
+    try {
+        const role = interaction.options.getRole('role');
+        
+        // Get the configuration file path
+        const configPath = path.join(
+            __dirname, '..', '..', 'config', 
+            `ticket-config-${interaction.guild.id}.json`
+        );
+        
+        // Check if configuration exists
+        if (!fs.existsSync(configPath)) {
+            return await interaction.editReply({
+                content: 'Ticket system has not been configured yet. Please use `/configticket setup` first.'
+            });
+        }
+        
+        // Read the configuration
+        const ticketConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        
+        // Check if the supportRoleIds array exists, create it if it doesn't
+        if (!ticketConfig.supportRoleIds) {
+            // Old config had a single supportRoleId
+            if (ticketConfig.supportRoleId) {
+                ticketConfig.supportRoleIds = [ticketConfig.supportRoleId];
+                delete ticketConfig.supportRoleId;
+            } else {
+                ticketConfig.supportRoleIds = [];
+            }
+        }
+        
+        // Check if the role is already in the list
+        if (ticketConfig.supportRoleIds.includes(role.id)) {
+            return await interaction.editReply({
+                content: `${role} is already a support role.`
+            });
+        }
+        
+        // Add the new role to the array
+        ticketConfig.supportRoleIds.push(role.id);
+        
+        // Save the updated configuration
+        fs.writeFileSync(configPath, JSON.stringify(ticketConfig, null, 2));
+        
+        // Create a list of all current support roles
+        const supportRolesList = await Promise.all(
+            ticketConfig.supportRoleIds.map(async roleId => {
+                const fetchedRole = await interaction.guild.roles.fetch(roleId).catch(() => null);
+                return fetchedRole ? `${fetchedRole}` : `Unknown Role (${roleId})`;
+            })
+        );
+        
+        // Create confirmation embed
+        const confirmEmbed = createEmbed({
+            title: 'Support Role Added',
+            description: `${role} has been added as a support role.`,
+            fields: [
+                {
+                    name: 'Current Support Roles',
+                    value: supportRolesList.join('\n') || 'No roles configured',
+                    inline: false
+                }
+            ],
+            footer: 'Any existing tickets will be updated with the new role permissions',
+            timestamp: true
+        });
+        
+        await interaction.editReply({
+            content: `✅ Added ${role} to support roles!`,
+            embeds: [confirmEmbed]
+        });
+    } catch (error) {
+        console.error('Error adding support role:', error);
+        await interaction.editReply({
+            content: 'There was an error adding the support role. Please try again later.'
+        });
+    }
+}
+
+async function removeSupportRole(interaction) {
+    await interaction.deferReply({ ephemeral: true });
+    
+    try {
+        const role = interaction.options.getRole('role');
+        
+        // Get the configuration file path
+        const configPath = path.join(
+            __dirname, '..', '..', 'config', 
+            `ticket-config-${interaction.guild.id}.json`
+        );
+        
+        // Check if configuration exists
+        if (!fs.existsSync(configPath)) {
+            return await interaction.editReply({
+                content: 'Ticket system has not been configured yet. Please use `/configticket setup` first.'
+            });
+        }
+        
+        // Read the configuration
+        const ticketConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        
+        // Check if the supportRoleIds array exists, create it if it doesn't
+        if (!ticketConfig.supportRoleIds) {
+            // Old config had a single supportRoleId
+            if (ticketConfig.supportRoleId) {
+                ticketConfig.supportRoleIds = [ticketConfig.supportRoleId];
+                delete ticketConfig.supportRoleId;
+            } else {
+                ticketConfig.supportRoleIds = [];
+            }
+        }
+        
+        // Check if the role is in the list
+        if (!ticketConfig.supportRoleIds.includes(role.id)) {
+            return await interaction.editReply({
+                content: `${role} is not currently a support role.`
+            });
+        }
+        
+        // Make sure we're not removing the last role
+        if (ticketConfig.supportRoleIds.length === 1) {
+            return await interaction.editReply({
+                content: 'You cannot remove the last support role. At least one support role is required.'
+            });
+        }
+        
+        // Remove the role from the array
+        ticketConfig.supportRoleIds = ticketConfig.supportRoleIds.filter(id => id !== role.id);
+        
+        // Save the updated configuration
+        fs.writeFileSync(configPath, JSON.stringify(ticketConfig, null, 2));
+        
+        // Create a list of all current support roles
+        const supportRolesList = await Promise.all(
+            ticketConfig.supportRoleIds.map(async roleId => {
+                const fetchedRole = await interaction.guild.roles.fetch(roleId).catch(() => null);
+                return fetchedRole ? `${fetchedRole}` : `Unknown Role (${roleId})`;
+            })
+        );
+        
+        // Create confirmation embed
+        const confirmEmbed = createEmbed({
+            title: 'Support Role Removed',
+            description: `${role} has been removed from support roles.`,
+            fields: [
+                {
+                    name: 'Current Support Roles',
+                    value: supportRolesList.join('\n') || 'No roles configured',
+                    inline: false
+                }
+            ],
+            footer: 'Any existing tickets will still have the previous role permissions',
+            timestamp: true
+        });
+        
+        await interaction.editReply({
+            content: `✅ Removed ${role} from support roles!`,
+            embeds: [confirmEmbed]
+        });
+    } catch (error) {
+        console.error('Error removing support role:', error);
+        await interaction.editReply({
+            content: 'There was an error removing the support role. Please try again later.'
+        });
+    }
+}
+
+async function listSupportRoles(interaction) {
+    await interaction.deferReply({ ephemeral: true });
+    
+    try {
+        // Get the configuration file path
+        const configPath = path.join(
+            __dirname, '..', '..', 'config', 
+            `ticket-config-${interaction.guild.id}.json`
+        );
+        
+        // Check if configuration exists
+        if (!fs.existsSync(configPath)) {
+            return await interaction.editReply({
+                content: 'Ticket system has not been configured yet. Please use `/configticket setup` first.'
+            });
+        }
+        
+        // Read the configuration
+        const ticketConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        
+        // Determine the support roles, handle both old and new config formats
+        let supportRoleIds = [];
+        if (ticketConfig.supportRoleIds) {
+            supportRoleIds = ticketConfig.supportRoleIds;
+        } else if (ticketConfig.supportRoleId) {
+            supportRoleIds = [ticketConfig.supportRoleId];
+        }
+        
+        // Fetch all role objects
+        const supportRoles = await Promise.all(
+            supportRoleIds.map(async roleId => {
+                const role = await interaction.guild.roles.fetch(roleId).catch(() => null);
+                return {
+                    role,
+                    id: roleId,
+                    exists: !!role
+                };
+            })
+        );
+        
+        // Create fields for each role with more details
+        const roleFields = supportRoles.map((roleInfo, index) => {
+            return {
+                name: `Role ${index + 1}${roleInfo.exists ? '' : ' (Missing)'}`,
+                value: roleInfo.exists 
+                    ? `${roleInfo.role} (ID: ${roleInfo.id})`
+                    : `Role ID: ${roleInfo.id} - This role no longer exists`,
+                inline: true
+            };
+        });
+        
+        // Create the embed with role information
+        const rolesEmbed = createEmbed({
+            title: 'Ticket Support Roles',
+            description: supportRoles.length > 0 
+                ? `Here are the roles that have access to support tickets:`
+                : `No support roles have been configured yet. Use \`/configticket setup\` to configure.`,
+            fields: roleFields.length > 0 ? roleFields : [{
+                name: 'No Roles Found',
+                value: 'Configure roles with `/configticket setup` or `/configticket addrole`',
+                inline: false
+            }],
+            footer: 'Use /configticket addrole to add more roles',
+            timestamp: true
+        });
+        
+        await interaction.editReply({
+            embeds: [rolesEmbed]
+        });
+    } catch (error) {
+        console.error('Error listing support roles:', error);
+        await interaction.editReply({
+            content: 'There was an error listing the support roles. Please try again later.'
         });
     }
 } 

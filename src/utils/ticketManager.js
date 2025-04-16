@@ -470,14 +470,14 @@ async function createTicket(interaction, config) {
         JSON.stringify(config, null, 2)
     );
     
-    // Get the support role
-    const supportRole = await interaction.guild.roles.fetch(config.supportRoleId).catch(() => null);
+    // Handle both old and new config formats for support roles
+    const supportRoleIds = config.supportRoleIds || (config.supportRoleId ? [config.supportRoleId] : []);
     
-    if (!supportRole) {
-        throw new Error('Support role not found. The ticket system may not be configured correctly.');
+    if (supportRoleIds.length === 0) {
+        throw new Error('No support roles found. The ticket system may not be configured correctly.');
     }
     
-    // Set up permissions
+    // Set up base permissions
     const permissionOverwrites = [
         {
             id: interaction.guild.id,
@@ -486,12 +486,24 @@ async function createTicket(interaction, config) {
         {
             id: interaction.user.id,
             allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.AttachFiles, PermissionsBitField.Flags.EmbedLinks],
-        },
-        {
-            id: supportRole.id,
-            allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.AttachFiles, PermissionsBitField.Flags.EmbedLinks, PermissionsBitField.Flags.ManageMessages],
         }
     ];
+    
+    // Add each support role with its permissions
+    for (const roleId of supportRoleIds) {
+        try {
+            const role = await interaction.guild.roles.fetch(roleId).catch(() => null);
+            if (role) {
+                permissionOverwrites.push({
+                    id: role.id,
+                    allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.AttachFiles, PermissionsBitField.Flags.EmbedLinks, PermissionsBitField.Flags.ManageMessages],
+                });
+            }
+        } catch (error) {
+            console.error(`Error fetching role ${roleId}:`, error);
+            // Continue with other roles even if one fails
+        }
+    }
     
     // Create the ticket channel
     const ticketChannel = await interaction.guild.channels.create({
@@ -536,9 +548,15 @@ async function createTicket(interaction, config) {
         timestamp: true
     });
     
+    // Get support role mentions
+    let supportRoleMentions = '';
+    for (const roleId of supportRoleIds) {
+        supportRoleMentions += `<@&${roleId}> `;
+    }
+    
     // Send the welcome message
     await ticketChannel.send({
-        content: `${interaction.user} ${supportRole}`,
+        content: `${interaction.user} ${supportRoleMentions}`,
         embeds: [embed],
         components: [buttons]
     });
