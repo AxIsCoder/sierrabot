@@ -89,6 +89,18 @@ async function setupTicketSystem(interaction) {
             fs.mkdirSync(configDir, { recursive: true });
         }
         
+        // Check if there's an existing config to preserve the lastTicketId
+        let lastTicketId = 0;
+        const configPath = path.join(configDir, `ticket-config-${interaction.guild.id}.json`);
+        if (fs.existsSync(configPath)) {
+            try {
+                const existingConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+                lastTicketId = existingConfig.lastTicketId || 0;
+            } catch (readError) {
+                console.error('Error reading existing config:', readError);
+            }
+        }
+        
         // Save the ticket configuration
         const ticketConfig = {
             guildId: interaction.guild.id,
@@ -100,18 +112,53 @@ async function setupTicketSystem(interaction) {
                 description: description,
                 color: color
             },
-            // Store the last ticket number for auto-incrementing IDs
-            lastTicketId: 0
+            // Preserve the last ticket number for auto-incrementing IDs
+            lastTicketId: lastTicketId
         };
         
         fs.writeFileSync(
-            path.join(configDir, `ticket-config-${interaction.guild.id}.json`),
+            configPath,
             JSON.stringify(ticketConfig, null, 2)
         );
         
-        // Reply with success message
+        // Create a preview embed to show the configuration
+        const previewEmbed = createEmbed({
+            title: '✅ Ticket System Configured',
+            description: 'The ticket system has been configured successfully. Here\'s a preview of your ticket embed:',
+            fields: [
+                {
+                    name: 'Channel',
+                    value: `${channel}`,
+                    inline: true
+                },
+                {
+                    name: 'Ticket Category',
+                    value: `${ticketCategory.name}`,
+                    inline: true
+                },
+                {
+                    name: 'Support Role',
+                    value: `${supportRole}`,
+                    inline: true
+                }
+            ],
+            footer: `Use /configticket send to send the ticket embed to ${channel.name}`,
+            timestamp: true
+        });
+        
+        // Create a sample of the ticket embed
+        const ticketPreviewEmbed = createEmbed({
+            title: ticketConfig.embed.title,
+            description: ticketConfig.embed.description,
+            color: ticketConfig.embed.color,
+            footer: 'This is a preview of the ticket embed',
+            timestamp: true
+        });
+        
+        // Reply with success message and preview
         await interaction.editReply({
-            content: `✅ Ticket system configured successfully! The ticket embed will appear in ${channel}.\n\nUse \`/configticket send\` to send the ticket embed to the channel.`,
+            content: `✅ Ticket system configured successfully! The ticket embed will appear in ${channel}.`,
+            embeds: [previewEmbed, ticketPreviewEmbed],
             ephemeral: true
         });
     } catch (error) {
@@ -172,11 +219,28 @@ async function sendTicketEmbed(interaction) {
         );
         
         // Send the embed with the button
-        await channel.send({ embeds: [embed], components: [button] });
+        const sentMessage = await channel.send({ embeds: [embed], components: [button] });
+        
+        // Create a confirmation embed
+        const confirmEmbed = createEmbed({
+            title: '✅ Ticket Embed Sent',
+            description: `The ticket embed has been sent to ${channel} successfully.`,
+            fields: [
+                {
+                    name: 'Message Link',
+                    value: `[Click to view](${sentMessage.url})`,
+                    inline: false
+                }
+            ],
+            thumbnail: interaction.client.user.displayAvatarURL({ dynamic: true }),
+            footer: `Configured by ${interaction.user.tag}`,
+            timestamp: true
+        });
         
         // Reply with success message
         await interaction.editReply({
             content: `✅ Ticket embed sent to ${channel} successfully!`,
+            embeds: [confirmEmbed],
             ephemeral: true
         });
     } catch (error) {

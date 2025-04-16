@@ -9,9 +9,10 @@ const path = require('path');
  * @returns {Promise<void>}
  */
 async function handleTicketButtonInteraction(interaction) {
-    await interaction.deferReply({ ephemeral: true });
-    
     try {
+        // First acknowledge the interaction to prevent timeouts
+        await interaction.deferReply({ ephemeral: true });
+        
         // Check if the ticket system is configured for this guild
         const configPath = path.join(
             __dirname, '..', 'config', 
@@ -41,16 +42,29 @@ async function handleTicketButtonInteraction(interaction) {
         // Create a new ticket
         const ticket = await createTicket(interaction, ticketConfig);
         
-        await interaction.editReply({
+        return await interaction.editReply({
             content: `Your ticket has been created: ${ticket}`,
             ephemeral: true
         });
     } catch (error) {
         console.error('Error handling ticket button interaction:', error);
-        await interaction.editReply({
-            content: 'There was an error creating your ticket. Please try again later or contact an administrator.',
-            ephemeral: true
-        });
+        
+        // Handle the case where interaction might not be deferred yet
+        try {
+            if (interaction.deferred) {
+                return await interaction.editReply({
+                    content: 'There was an error creating your ticket. Please try again later or contact an administrator.',
+                    ephemeral: true
+                });
+            } else {
+                return await interaction.reply({
+                    content: 'There was an error creating your ticket. Please try again later or contact an administrator.',
+                    ephemeral: true
+                });
+            }
+        } catch (replyError) {
+            console.error('Failed to reply with error message:', replyError);
+        }
     }
 }
 
