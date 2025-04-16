@@ -182,8 +182,7 @@ async function sendTicketEmbed(interaction) {
         
         if (!fs.existsSync(configPath)) {
             return await interaction.editReply({
-                content: 'Ticket system has not been configured yet. Please use `/configticket setup` first.',
-                ephemeral: true
+                content: 'Ticket system has not been configured yet. Please use `/configticket setup` first.'
             });
         }
         
@@ -195,8 +194,7 @@ async function sendTicketEmbed(interaction) {
         
         if (!channel) {
             return await interaction.editReply({
-                content: 'The configured channel no longer exists. Please reconfigure the ticket system.',
-                ephemeral: true
+                content: 'The configured channel no longer exists. Please reconfigure the ticket system.'
             });
         }
         
@@ -218,36 +216,41 @@ async function sendTicketEmbed(interaction) {
                 .setEmoji('🎫')
         );
         
-        // Send the embed with the button
-        const sentMessage = await channel.send({ embeds: [embed], components: [button] });
-        
-        // Create a confirmation embed
-        const confirmEmbed = createEmbed({
-            title: '✅ Ticket Embed Sent',
-            description: `The ticket embed has been sent to ${channel} successfully.`,
-            fields: [
-                {
-                    name: 'Message Link',
-                    value: `[Click to view](${sentMessage.url})`,
-                    inline: false
-                }
-            ],
-            thumbnail: interaction.client.user.displayAvatarURL({ dynamic: true }),
-            footer: `Configured by ${interaction.user.tag}`,
-            timestamp: true
-        });
-        
-        // Reply with success message
-        await interaction.editReply({
-            content: `✅ Ticket embed sent to ${channel} successfully!`,
-            embeds: [confirmEmbed],
-            ephemeral: true
-        });
+        // Send the embed with the button - make sure to catch any errors
+        try {
+            const sentMessage = await channel.send({ embeds: [embed], components: [button] });
+            
+            // Create a confirmation embed
+            const confirmEmbed = createEmbed({
+                title: '✅ Ticket Embed Sent',
+                description: `The ticket embed has been sent to ${channel} successfully.`,
+                fields: [
+                    {
+                        name: 'Message Link',
+                        value: `[Click to view](${sentMessage.url})`,
+                        inline: false
+                    }
+                ],
+                thumbnail: interaction.client.user.displayAvatarURL({ dynamic: true }),
+                footer: `Configured by ${interaction.user.tag}`,
+                timestamp: true
+            });
+            
+            // Reply with success message
+            await interaction.editReply({
+                content: `✅ Ticket embed sent to ${channel} successfully!`,
+                embeds: [confirmEmbed]
+            });
+        } catch (sendError) {
+            console.error('Error sending ticket embed to channel:', sendError);
+            return await interaction.editReply({
+                content: `Failed to send the ticket embed to ${channel}. Please check the bot's permissions in that channel.`
+            });
+        }
     } catch (error) {
         console.error('Error sending ticket embed:', error);
         await interaction.editReply({
-            content: 'There was an error sending the ticket embed. Please try again later.',
-            ephemeral: true
+            content: 'There was an error sending the ticket embed. Please try again later.'
         });
     }
 } 

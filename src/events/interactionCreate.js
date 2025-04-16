@@ -42,16 +42,20 @@ module.exports = {
                     }
                 } catch (buttonError) {
                     console.error('Error handling button interaction:', buttonError);
-                    if (!interaction.replied && !interaction.deferred) {
-                        await interaction.reply({ 
-                            content: 'An error occurred while processing this button. Please try again later.', 
-                            ephemeral: true 
-                        });
-                    } else if (interaction.deferred) {
-                        await interaction.editReply({ 
-                            content: 'An error occurred while processing this button. Please try again later.', 
-                            ephemeral: true 
-                        });
+                    
+                    try {
+                        if (!interaction.replied && !interaction.deferred) {
+                            await interaction.reply({ 
+                                content: 'An error occurred while processing this button. Please try again later.', 
+                                ephemeral: true 
+                            });
+                        } else if (interaction.deferred) {
+                            await interaction.editReply({ 
+                                content: 'An error occurred while processing this button. Please try again later.'
+                            });
+                        }
+                    } catch (replyError) {
+                        console.error('Failed to reply to error:', replyError);
                     }
                 }
                 return;
@@ -72,15 +76,19 @@ module.exports = {
                     console.error(`Error executing ${interaction.commandName}`);
                     console.error(error);
                     
-                    const errorReply = {
-                        content: 'There was an error while executing this command!',
-                        ephemeral: true
-                    };
-                    
-                    if (interaction.replied || interaction.deferred) {
-                        await interaction.followUp(errorReply);
-                    } else {
-                        await interaction.reply(errorReply);
+                    try {
+                        const errorReply = {
+                            content: 'There was an error while executing this command!',
+                            ephemeral: true
+                        };
+                        
+                        if (interaction.replied || interaction.deferred) {
+                            await interaction.followUp(errorReply);
+                        } else {
+                            await interaction.reply(errorReply);
+                        }
+                    } catch (replyError) {
+                        console.error('Failed to reply with error message:', replyError);
                     }
                 }
             }

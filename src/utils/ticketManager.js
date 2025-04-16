@@ -1,4 +1,4 @@
-const { PermissionsBitField, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, AttachmentBuilder } = require('discord.js');
+const { PermissionsBitField, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, AttachmentBuilder, InteractionResponseType, InteractionResponse } = require('discord.js');
 const { createEmbed } = require('./embedCreator');
 const fs = require('fs');
 const path = require('path');
@@ -11,7 +11,9 @@ const path = require('path');
 async function handleTicketButtonInteraction(interaction) {
     try {
         // First acknowledge the interaction to prevent timeouts
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ 
+            ephemeral: true 
+        });
         
         // Check if the ticket system is configured for this guild
         const configPath = path.join(
@@ -21,8 +23,7 @@ async function handleTicketButtonInteraction(interaction) {
         
         if (!fs.existsSync(configPath)) {
             return await interaction.editReply({
-                content: 'The ticket system is not configured properly. Please contact an administrator.',
-                ephemeral: true
+                content: 'The ticket system is not configured properly. Please contact an administrator.'
             });
         }
         
@@ -34,8 +35,7 @@ async function handleTicketButtonInteraction(interaction) {
         
         if (existingTicket) {
             return await interaction.editReply({
-                content: `You already have an open ticket: ${existingTicket}`,
-                ephemeral: true
+                content: `You already have an open ticket: ${existingTicket}`
             });
         }
         
@@ -43,8 +43,7 @@ async function handleTicketButtonInteraction(interaction) {
         const ticket = await createTicket(interaction, ticketConfig);
         
         return await interaction.editReply({
-            content: `Your ticket has been created: ${ticket}`,
-            ephemeral: true
+            content: `Your ticket has been created: ${ticket}`
         });
     } catch (error) {
         console.error('Error handling ticket button interaction:', error);
@@ -53,8 +52,7 @@ async function handleTicketButtonInteraction(interaction) {
         try {
             if (interaction.deferred) {
                 return await interaction.editReply({
-                    content: 'There was an error creating your ticket. Please try again later or contact an administrator.',
-                    ephemeral: true
+                    content: 'There was an error creating your ticket. Please try again later or contact an administrator.'
                 });
             } else {
                 return await interaction.reply({
