@@ -1,6 +1,6 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { createEmbed } = require('../../utils/embedCreator');
-const { CATEGORIES, BOT_NAME, GITHUB_REPO } = require('../../utils/constants');
+const { CATEGORIES, BOT_NAME, GITHUB_REPO, SUPPORT_SERVER } = require('../../utils/constants');
 const { exec } = require('child_process');
 const { promisify } = require('util');
 const execAsync = promisify(exec);
@@ -56,7 +56,6 @@ module.exports = {
                             `**Uptime:** ${uptime}`,
                             `**Memory Usage:** ${memoryUsage} MB`,
                             `**Servers:** ${interaction.client.guilds.cache.size}`,
-                            `**Platform:** ${platform}`,
                             `**Node.js:** ${process.version}`
                         ].join('\n')
                     },
@@ -68,7 +67,8 @@ module.exports = {
                         name: '🔗 Links',
                         value: [
                             `[GitHub Repository](${GITHUB_REPO})`,
-                            `[Invite Bot](https://discord.com/oauth2/authorize?client_id=${interaction.client.user.id}&permissions=8&scope=bot%20applications.commands)`
+                            `[Invite Bot](https://discord.com/oauth2/authorize?client_id=${interaction.client.user.id}&permissions=8&scope=bot%20applications.commands)`,
+                            `[Support Server](${SUPPORT_SERVER})`
                         ].join('\n')
                     }
                 ],

@@ -26,8 +26,8 @@ module.exports = {
     
     // Bot information
     BOT_NAME: 'Sierra',
-    SUPPORT_SERVER: 'https://discord.gg/your-server',
-    GITHUB_REPO: 'https://github.com/yourusername/sierra-bot',
+    SUPPORT_SERVER: 'https://discord.gg/3an88epReH',
+    GITHUB_REPO: 'https://github.com/yourusername/sierrabot',
     
     // Max items to display in lists
     MAX_LIST_ITEMS: 10,
