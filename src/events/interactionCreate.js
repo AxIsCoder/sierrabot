@@ -11,9 +11,28 @@ module.exports = {
                     // Log interaction details for debugging
                     console.log(`Button interaction: ${interaction.customId} by ${interaction.user.tag}`);
                     
-                    // Handle ticket creation button
-                    if (interaction.customId === 'create_ticket') {
-                        await handleTicketButtonInteraction(interaction);
+                    // Handle ticket creation button - support both IDs for backward compatibility
+                    if (interaction.customId === 'open_ticket' || interaction.customId === 'create_ticket') {
+                        // Reply immediately to avoid "interaction failed" error
+                        await interaction.reply({ 
+                            content: "Creating your ticket...", 
+                            flags: 64  // Ephemeral flag
+                        });
+                        
+                        // Process the ticket creation
+                        try {
+                            const ticketChannel = await handleTicketButtonInteraction(interaction);
+                            if (ticketChannel) {
+                                await interaction.editReply({
+                                    content: `Your ticket has been created: ${ticketChannel}`
+                                });
+                            }
+                        } catch (ticketError) {
+                            console.error('Error creating ticket:', ticketError);
+                            await interaction.editReply({
+                                content: 'There was an error creating your ticket. Please try again later or contact an administrator.'
+                            });
+                        }
                         return;
                     }
                     

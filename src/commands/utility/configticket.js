@@ -251,10 +251,10 @@ async function sendTicketEmbed(interaction) {
             timestamp: true
         });
         
-        // Create the button for opening tickets
+        // Create the button with a simplified ID and more common style
         const button = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-                .setCustomId('create_ticket')
+                .setCustomId('open_ticket') // Simplified ID
                 .setLabel('Open a Ticket')
                 .setStyle(ButtonStyle.Primary)
                 .setEmoji('🎫')
@@ -262,6 +262,20 @@ async function sendTicketEmbed(interaction) {
         
         // Send the embed with the button - make sure to catch any errors
         try {
+            // Delete any previous ticket embeds in the channel first
+            const messages = await channel.messages.fetch({ limit: 10 });
+            const botMessages = messages.filter(msg => 
+                msg.author.id === interaction.client.user.id && 
+                msg.embeds.length > 0 && 
+                msg.embeds[0].data.title === ticketConfig.embed.title
+            );
+            
+            // Delete the previous embeds if found
+            if (botMessages.size > 0) {
+                await channel.bulkDelete(botMessages).catch(e => console.error('Failed to delete previous ticket embeds:', e));
+            }
+            
+            // Send the new embed
             const sentMessage = await channel.send({ embeds: [embed], components: [button] });
             
             // Create a confirmation embed

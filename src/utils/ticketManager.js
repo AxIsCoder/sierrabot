@@ -6,16 +6,11 @@ const path = require('path');
 /**
  * Handle when a user clicks the create ticket button
  * @param {Object} interaction - The button interaction
- * @returns {Promise<void>}
+ * @returns {Promise<Channel|null>} - The created ticket channel or null if failed
  */
 async function handleTicketButtonInteraction(interaction) {
     try {
-        // First acknowledge the interaction to prevent timeouts
-        // Important: We have to respond within 3 seconds to avoid the "interaction failed" error
-        await interaction.reply({ 
-            content: "Creating your ticket...", 
-            flags: 64  // Using flags value for ephemeral (64 = 1 << 6, EPHEMERAL flag)
-        });
+        // Note: We now expect the interaction to already be replied to from the interactionCreate handler
         
         // Check if the ticket system is configured for this guild
         const configPath = path.join(
@@ -24,9 +19,8 @@ async function handleTicketButtonInteraction(interaction) {
         );
         
         if (!fs.existsSync(configPath)) {
-            return await interaction.editReply({
-                content: 'The ticket system is not configured properly. Please contact an administrator.'
-            });
+            console.error('Ticket config not found:', configPath);
+            return null;
         }
         
         // Read ticket configuration
@@ -36,39 +30,15 @@ async function handleTicketButtonInteraction(interaction) {
         const existingTicket = await findExistingTicket(interaction.guild, interaction.user.id, ticketConfig.ticketCategoryId);
         
         if (existingTicket) {
-            return await interaction.editReply({
-                content: `You already have an open ticket: ${existingTicket}`
-            });
+            return existingTicket;
         }
         
         // Create a new ticket
         const ticket = await createTicket(interaction, ticketConfig);
-        
-        return await interaction.editReply({
-            content: `Your ticket has been created: ${ticket}`
-        });
+        return ticket;
     } catch (error) {
         console.error('Error handling ticket button interaction:', error);
-        
-        // Handle the case where interaction might not be replied yet
-        try {
-            if (interaction.replied) {
-                return await interaction.editReply({
-                    content: 'There was an error creating your ticket. Please try again later or contact an administrator.'
-                });
-            } else if (interaction.deferred) {
-                return await interaction.editReply({
-                    content: 'There was an error creating your ticket. Please try again later or contact an administrator.'
-                });
-            } else {
-                return await interaction.reply({
-                    content: 'There was an error creating your ticket. Please try again later or contact an administrator.',
-                    flags: 64  // Using flags value for ephemeral
-                });
-            }
-        } catch (replyError) {
-            console.error('Failed to reply with error message:', replyError);
-        }
+        return null;
     }
 }
 
