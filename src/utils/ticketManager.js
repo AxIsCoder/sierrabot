@@ -548,5 +548,7 @@ module.exports = {
     handleCloseTicketInteraction,
     handleTranscriptInteraction,
     createTicket,
-    findExistingTicket
+    findExistingTicket,
+    generateTranscript,
+    getUserIdFromTicket
 }; 
