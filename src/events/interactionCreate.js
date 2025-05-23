@@ -86,6 +86,54 @@ module.exports = {
                 return;
             }
             
+            // Handle select menu interactions
+            if (interaction.isStringSelectMenu()) {
+                try {
+                    console.log(`Select menu interaction: ${interaction.customId} by ${interaction.user.tag}`);
+                    
+                    // Handle help category selection
+                    if (interaction.customId === 'help_category_select') {
+                        const selectedCategory = interaction.values[0];
+                        const helpCommand = interaction.client.commands.get('help');
+                        
+                        if (helpCommand && helpCommand.showCategoryHelp) {
+                            await helpCommand.showCategoryHelp(interaction, selectedCategory);
+                        } else {
+                            await interaction.update({
+                                content: 'Sorry, I couldn\'t load the help information for this category.',
+                                embeds: [],
+                                components: []
+                            });
+                        }
+                        return;
+                    }
+                    
+                    // Unknown select menu
+                    if (!interaction.replied && !interaction.deferred) {
+                        await interaction.update({
+                            content: 'This selection is not recognized.',
+                            embeds: [],
+                            components: []
+                        });
+                    }
+                } catch (selectError) {
+                    console.error('Error handling select menu interaction:', selectError);
+                    
+                    try {
+                        if (!interaction.replied && !interaction.deferred) {
+                            await interaction.update({
+                                content: 'An error occurred while processing this selection. Please try again later.',
+                                embeds: [],
+                                components: []
+                            });
+                        }
+                    } catch (replyError) {
+                        console.error('Failed to reply to select menu error:', replyError);
+                    }
+                }
+                return;
+            }
+            
             // Handle slash commands
             if (interaction.isChatInputCommand()) {
                 const command = interaction.client.commands.get(interaction.commandName);
