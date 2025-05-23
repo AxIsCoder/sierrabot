@@ -1,6 +1,19 @@
 const { Events, InteractionType } = require('discord.js');
 const { handleTicketButtonInteraction, handleCloseTicketInteraction, handleTranscriptInteraction } = require('../utils/ticketManager');
 
+// Utility function to handle API errors quietly
+function handleApiError(error, context) {
+    // Only log specific errors as warnings without full stack trace
+    if (error.code === 10062) { // Unknown Interaction
+        console.log(`[WARN] Unknown interaction in ${context}`);
+    } else if (error.code === 40060) { // Already acknowledged
+        console.log(`[WARN] Interaction already acknowledged in ${context}`);
+    } else {
+        // For unexpected errors, still log the full error
+        console.error(`[ERROR] Failed in ${context}:`, error);
+    }
+}
+
 module.exports = {
     name: Events.InteractionCreate,
     async execute(interaction) {
@@ -14,10 +27,7 @@ module.exports = {
                     // Handle ticket creation button - support both IDs for backward compatibility
                     if (interaction.customId === 'open_ticket' || interaction.customId === 'create_ticket') {
                         // Reply immediately to avoid "interaction failed" error
-                        await interaction.reply({ 
-                            content: "Creating your ticket...", 
-                            flags: 64  // Ephemeral flag
-                        });
+                        await interaction.deferReply({ ephemeral: true });
                         
                         // Process the ticket creation
                         try {
@@ -25,13 +35,13 @@ module.exports = {
                             if (ticketChannel) {
                                 await interaction.editReply({
                                     content: `Your ticket has been created: ${ticketChannel}`
-                                });
+                                }).catch(error => handleApiError(error, 'ticket creation edit reply'));
                             }
                         } catch (ticketError) {
                             console.error('Error creating ticket:', ticketError);
                             await interaction.editReply({
                                 content: 'There was an error creating your ticket. Please try again later or contact an administrator.'
-                            });
+                            }).catch(error => handleApiError(error, 'ticket error edit reply'));
                         }
                         return;
                     }
@@ -50,8 +60,6 @@ module.exports = {
                     
                     // Handle confirmation buttons for closing tickets
                     if (interaction.customId === 'confirm_close' || interaction.customId === 'cancel_close') {
-                        // These are handled in the handleCloseTicketInteraction function by awaitMessageComponent
-                        // We just need to acknowledge the interaction to avoid interaction failed errors
                         if (!interaction.replied && !interaction.deferred) {
                             await interaction.deferUpdate().catch(console.error);
                         }
@@ -62,25 +70,20 @@ module.exports = {
                     if (!interaction.replied && !interaction.deferred) {
                         await interaction.reply({ 
                             content: 'This button action is not recognized.', 
-                            flags: 64 // ephemeral flag value
-                        });
+                            ephemeral: true
+                        }).catch(error => handleApiError(error, 'unknown button reply'));
                     }
                 } catch (buttonError) {
-                    console.error('Error handling button interaction:', buttonError);
+                    // Only log non-API errors fully
+                    if (!buttonError.code) {
+                        console.error('Error handling button interaction:', buttonError);
+                    }
                     
-                    try {
-                        if (!interaction.replied && !interaction.deferred) {
-                            await interaction.reply({ 
-                                content: 'An error occurred while processing this button. Please try again later.', 
-                                flags: 64 // ephemeral flag value  
-                            });
-                        } else if (interaction.deferred) {
-                            await interaction.editReply({ 
-                                content: 'An error occurred while processing this button. Please try again later.'
-                            });
-                        }
-                    } catch (replyError) {
-                        console.error('Failed to reply to error:', replyError);
+                    if (!interaction.replied && !interaction.deferred) {
+                        await interaction.reply({ 
+                            content: 'An error occurred while processing this button. Please try again later.', 
+                            ephemeral: true
+                        }).catch(error => handleApiError(error, 'button error reply'));
                     }
                 }
                 return;
@@ -103,7 +106,7 @@ module.exports = {
                                 content: 'Sorry, I couldn\'t load the help information for this category.',
                                 embeds: [],
                                 components: []
-                            });
+                            }).catch(error => handleApiError(error, 'help menu selection error'));
                         }
                         return;
                     }
@@ -114,21 +117,33 @@ module.exports = {
                             content: 'This selection is not recognized.',
                             embeds: [],
                             components: []
-                        });
+                        }).catch(error => handleApiError(error, 'unknown menu selection'));
                     }
                 } catch (selectError) {
-                    console.error('Error handling select menu interaction:', selectError);
+                    // Only log non-API errors fully
+                    if (!selectError.code) {
+                        console.error('Error handling select menu interaction:', selectError);
+                    }
                     
-                    try {
-                        if (!interaction.replied && !interaction.deferred) {
+                    if (!interaction.replied && !interaction.deferred) {
+                        try {
                             await interaction.update({
                                 content: 'An error occurred while processing this selection. Please try again later.',
                                 embeds: [],
                                 components: []
-                            });
+                            }).catch(error => handleApiError(error, 'select menu error update'));
+                        } catch (responseError) {
+                            console.log('[WARN] Failed to respond with select menu error message');
+                            // Try fallback to reply if update fails
+                            try {
+                                await interaction.reply({
+                                    content: 'An error occurred while processing this selection. Please try again later.',
+                                    ephemeral: true
+                                }).catch(error => handleApiError(error, 'select menu fallback reply'));
+                            } catch (fallbackError) {
+                                console.log('[WARN] Failed to send fallback error message for select menu');
+                            }
                         }
-                    } catch (replyError) {
-                        console.error('Failed to reply to select menu error:', replyError);
                     }
                 }
                 return;
@@ -139,34 +154,61 @@ module.exports = {
                 const command = interaction.client.commands.get(interaction.commandName);
                 
                 if (!command) {
-                    console.error(`No command matching ${interaction.commandName} was found.`);
+                    console.log(`[WARN] No command matching ${interaction.commandName} was found.`);
+                    if (!interaction.replied && !interaction.deferred) {
+                        await interaction.reply({
+                            content: 'This command is not available.',
+                            ephemeral: true
+                        }).catch(error => handleApiError(error, 'unknown command reply'));
+                    }
                     return;
                 }
                 
                 try {
+                    // Execute the command
                     await command.execute(interaction);
                 } catch (error) {
-                    console.error(`Error executing ${interaction.commandName}`);
-                    console.error(error);
+                    // Only log non-API errors fully
+                    if (!error.code) {
+                        console.error(`Error executing ${interaction.commandName}:`, error);
+                    } else {
+                        console.log(`[WARN] API error in ${interaction.commandName}: ${error.code}`);
+                    }
                     
                     try {
-                        const errorReply = {
-                            content: 'There was an error while executing this command!',
-                            flags: 64 // ephemeral flag value
-                        };
-                        
-                        if (interaction.replied || interaction.deferred) {
-                            await interaction.followUp(errorReply);
-                        } else {
-                            await interaction.reply(errorReply);
+                        // If the command hasn't handled the interaction yet, reply with an error
+                        if (!interaction.replied && !interaction.deferred) {
+                            await interaction.reply({
+                                content: 'There was an error while executing this command!',
+                                ephemeral: true
+                            }).catch(error => handleApiError(error, 'command error reply'));
                         }
-                    } catch (replyError) {
-                        console.error('Failed to reply with error message:', replyError);
+                        // If the command deferred but didn't complete, edit the reply
+                        else if (interaction.deferred && !interaction.replied) {
+                            await interaction.editReply({
+                                content: 'There was an error while executing this command!'
+                            }).catch(error => handleApiError(error, 'command error edit reply'));
+                        }
+                    } catch (responseError) {
+                        console.log('[WARN] Failed to respond with command error message');
                     }
                 }
             }
         } catch (error) {
-            console.error('Error in interaction handling:', error);
+            // Only log non-API errors fully
+            if (!error.code) {
+                console.error('Error in interaction handling:', error);
+            } else {
+                console.log(`[WARN] API error in interaction handling: ${error.code}`);
+            }
+            
+            // Only try to respond if we haven't already
+            if (!interaction.replied && !interaction.deferred) {
+                await interaction.reply({
+                    content: 'There was an error processing your request.',
+                    ephemeral: true
+                }).catch(error => handleApiError(error, 'global error reply'));
+            }
         }
     },
 }; 

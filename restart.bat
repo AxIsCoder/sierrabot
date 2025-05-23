@@ -1,0 +1,9 @@
+@echo off
+echo Stopping any existing bot processes...
+taskkill /f /im node.exe
+
+echo Deploying commands...
+call npm run deploy
+
+echo Starting bot...
+npm run dev 

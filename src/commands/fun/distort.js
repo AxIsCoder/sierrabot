@@ -35,12 +35,18 @@ module.exports = {
             const effect = interaction.options.getString('effect') || 'random';
             
             try {
-                // Get user's avatar URL in larger size
+                // Get user's avatar URL in larger size - force PNG format
                 const avatarURL = targetUser.displayAvatarURL({ 
                     extension: 'png', 
                     forceStatic: true,
-                    size: 1024 
+                    size: 512 
                 });
+                
+                if (!avatarURL) {
+                    return await interaction.editReply({
+                        content: '❌ Could not retrieve a valid avatar for this user.'
+                    });
+                }
                 
                 // Process the image
                 const result = await distortImage(avatarURL, effect);

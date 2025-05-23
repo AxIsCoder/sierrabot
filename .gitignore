@@ -62,4 +62,17 @@ src/assets/images/temp/
 # Windows
 Thumbs.db
 ehthumbs.db
-Desktop.ini 
+Desktop.ini
+
+# nyc test coverage
+.nyc_output
+
+# Data files (except example files)
+src/data/messages/
+src/data/warnings/
+src/data/reminders/
+
+# Keep example files
+!src/data/messages/messages-example.json
+!src/data/warnings/warnings-example.json
+!src/data/reminders/reminders-example.json 
