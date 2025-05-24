@@ -543,11 +543,87 @@ function addNoise(image, intensity = 0.05) {
     }
 }
 
+// Add constants for the level bar and styling
+const CARD_WIDTH = 800;
+const CARD_HEIGHT = 300;
+const AVATAR_SIZE = 150;
+const AVATAR_BORDER = 5;
+const LEVEL_BAR_WIDTH = 500;
+const LEVEL_BAR_HEIGHT = 25;
+const LEVEL_BAR_Y_OFFSET = 200;
+const LEVEL_BAR_COLOR_EMPTY = 0x36393FFF; // Discord dark mode secondary color
+const LEVEL_BAR_COLOR_FILLED = 0xFFFFFFFF; // White
+const TEXT_COLOR = 0xFFFFFFFF; // White text
+const BACKGROUND_COLOR = 0x2C2F33FF; // Discord dark mode background color
+const ACCENT_COLOR = 0xFFFFFFFF; // White accent color
+const CARD_CORNER_RADIUS = 30; // Rounded corners for the card
+const LEVEL_BAR_CORNER_RADIUS = 15; // Rounded corners for the level bar
+
 /**
- * Create a profile card with user stats
+ * Create a gradient background
+ * @param {Jimp} image - Jimp image object
+ */
+function createGradientBackground(image) {
+    const width = image.getWidth();
+    const height = image.getHeight();
+    
+    // Create gradient from top to bottom
+    for (let y = 0; y < height; y++) {
+        const progress = y / height;
+        const r = Math.floor(44 + (progress * 20)); // 44 to 64
+        const g = Math.floor(47 + (progress * 20)); // 47 to 67
+        const b = Math.floor(51 + (progress * 20)); // 51 to 71
+        
+        for (let x = 0; x < width; x++) {
+            image.setPixelColor(Jimp.rgbaToInt(r, g, b, 255), x, y);
+        }
+    }
+}
+
+/**
+ * Create a rounded rectangle mask
+ * @param {number} width - Width of the rectangle
+ * @param {number} height - Height of the rectangle
+ * @param {number} radius - Corner radius
+ * @returns {Jimp} - Mask image
+ */
+function createRoundedMask(width, height, radius) {
+    const mask = new Jimp(width, height, 0x00000000);
+    
+    // Draw rounded rectangle
+    for (let x = 0; x < width; x++) {
+        for (let y = 0; y < height; y++) {
+            // Check if pixel is in corner
+            if ((x < radius && y < radius) || // Top-left
+                (x > width - radius - 1 && y < radius) || // Top-right
+                (x < radius && y > height - radius - 1) || // Bottom-left
+                (x > width - radius - 1 && y > height - radius - 1)) { // Bottom-right
+                
+                // Calculate distance from corner
+                const cornerX = x < radius ? x : width - x - 1;
+                const cornerY = y < radius ? y : height - y - 1;
+                const distance = Math.sqrt(cornerX * cornerX + cornerY * cornerY);
+                
+                // If within radius, make pixel transparent
+                if (distance <= radius) {
+                    mask.setPixelColor(0x00000000, x, y);
+                } else {
+                    mask.setPixelColor(0xFFFFFFFF, x, y);
+                }
+            } else {
+                mask.setPixelColor(0xFFFFFFFF, x, y);
+            }
+        }
+    }
+    
+    return mask;
+}
+
+/**
+ * Create a profile card image
  * @param {string} avatarUrl - URL of the user's avatar
- * @param {Object} userData - User data to display
- * @returns {Promise<Object>} - Object containing path to profile card image
+ * @param {object} userData - Object containing user data
+ * @returns {Promise<{path: string}>} - Path to the generated profile card image
  */
 async function createProfileCard(avatarUrl, userData) {
     try {
@@ -560,93 +636,88 @@ async function createProfileCard(avatarUrl, userData) {
         // Generate unique filename
         const outputPath = path.join(outputDir, `profile-${uuidv4()}.png`);
         
-        // Smaller card size
-        const cardWidth = 400;
-        const cardHeight = 200;
-        const image = new Jimp(cardWidth, cardHeight, 0x23272aff); // Discord dark background
+        // Create base image
+        const image = new Jimp(CARD_WIDTH, CARD_HEIGHT, BACKGROUND_COLOR);
         
-        // Download the avatar
-        const response = await axios({
-            url: avatarUrl,
-            method: 'GET',
-            responseType: 'arraybuffer'
-        });
+        // Create gradient background
+        createGradientBackground(image);
         
-        // Load the avatar image
-        const avatar = await Jimp.read(Buffer.from(response.data));
+        // Create rounded corners mask
+        const mask = createRoundedMask(CARD_WIDTH, CARD_HEIGHT, CARD_CORNER_RADIUS);
+        image.mask(mask, 0, 0);
         
-        // Smaller avatar, circular
-        avatar.resize(64, 64);
-        const mask = new Jimp(64, 64, 0x00000000);
-        const radius = 32;
-        mask.scan(0, 0, 64, 64, function(x, y, idx) {
-            const distX = x - radius;
-            const distY = y - radius;
-            const distance = Math.sqrt(distX * distX + distY * distY);
-            if (distance <= radius) {
-                this.setPixelColor(0xffffffff, x, y);
-            }
-        });
-        avatar.mask(mask, 0, 0);
-        image.composite(avatar, 16, 16);
+        // Download and process avatar
+        const avatar = await Jimp.read(avatarUrl);
+        avatar.resize(AVATAR_SIZE, AVATAR_SIZE);
+        avatar.circle();
         
-        // Load smaller fonts
-        const font = await Jimp.loadFont(Jimp.FONT_SANS_16_WHITE);
-        const smallFont = await Jimp.loadFont(Jimp.FONT_SANS_16_WHITE);
+        // Create avatar border with glow effect
+        const border = new Jimp(AVATAR_SIZE + (AVATAR_BORDER * 2), AVATAR_SIZE + (AVATAR_BORDER * 2), ACCENT_COLOR);
+        border.circle();
         
-        // Add username (bold, slightly larger)
-        image.print(font, 96, 20, {
-            text: userData.username,
-            alignmentX: Jimp.HORIZONTAL_ALIGN_LEFT,
-            alignmentY: Jimp.VERTICAL_ALIGN_TOP
-        }, cardWidth - 110, 24);
+        // Composite avatar with border
+        border.composite(avatar, AVATAR_BORDER, AVATAR_BORDER);
         
-        // Add user stats, stacked vertically
-        let yPos = 50;
-        if (userData.rank) {
-            image.print(smallFont, 96, yPos, `Rank: #${userData.rank}`);
-            yPos += 20;
-        }
-        if (userData.messages) {
-            image.print(smallFont, 96, yPos, `Messages: ${userData.messages}`);
-            yPos += 20;
-        }
+        // Add avatar to card (positioned for visual balance)
+        image.composite(border, 40, (CARD_HEIGHT - (AVATAR_SIZE + AVATAR_BORDER * 2)) / 2);
+        
+        // Load fonts
+        const fontBold32 = await Jimp.loadFont(Jimp.FONT_SANS_32_WHITE);
+        const fontNormal16 = await Jimp.loadFont(Jimp.FONT_SANS_16_WHITE);
+        
+        // Define text positions relative to the right of the avatar
+        const textStartX = 40 + AVATAR_SIZE + AVATAR_BORDER * 2 + 30; // Avatar right edge + spacing
+        
+        // Add username
+        const username = userData.username;
+        image.print(fontBold32, textStartX, 50, username);
+        
+        // Add stats in a column
+        const statsYStart = 100;
+        const statsSpacing = 25;
+        
+        image.print(fontNormal16, textStartX, statsYStart, `Message Rank: #${userData.messageRank}`);
+        image.print(fontNormal16, textStartX, statsYStart + statsSpacing, `Messages Sent: ${userData.messages}`);
         if (userData.joined) {
-            image.print(smallFont, 96, yPos, `Joined: ${userData.joined}`);
-            yPos += 20;
+            image.print(fontNormal16, textStartX, statsYStart + (statsSpacing * 2), `Joined Server: ${userData.joined}`);
         }
-        if (userData.level) {
-            // Draw smaller level bar
-            const barWidth = 180;
-            const barHeight = 10;
-            const barX = 96;
-            const barY = cardHeight - 36;
-            // Background bar
-            image.scan(barX, barY, barWidth, barHeight, function(x, y, idx) {
-                this.setPixelColor(0x444444ff, x, y);
-            });
-            // Progress bar
-            const progress = Math.min(1, Math.max(0, userData.xp / userData.levelupXp));
-            const progressWidth = Math.floor(barWidth * progress);
-            image.scan(barX, barY, progressWidth, barHeight, function(x, y, idx) {
-                this.setPixelColor(0x7289daff, x, y); // Discord blue color
-            });
-            // Print level text
-            image.print(smallFont, barX, barY - 16, `Level ${userData.level}`);
-            image.print(smallFont, barX + barWidth - 80, barY - 16, `${userData.xp}/${userData.levelupXp} XP`);
+        
+        // Add level and XP text
+        const { level, xp, xpNeeded } = userData;
+        image.print(fontBold32, textStartX, 180, `Level ${level}`); // Position level just above bar
+        
+        // Create level bar
+        const levelBarX = textStartX;
+        const levelBarY = 220; // Position bar below stats
+        
+        // Create rounded level bar background
+        const barBg = new Jimp(LEVEL_BAR_WIDTH, LEVEL_BAR_HEIGHT, LEVEL_BAR_COLOR_EMPTY);
+        const barMask = createRoundedMask(LEVEL_BAR_WIDTH, LEVEL_BAR_HEIGHT, LEVEL_BAR_CORNER_RADIUS);
+        barBg.mask(barMask, 0, 0);
+        image.composite(barBg, levelBarX, levelBarY);
+        
+        // Calculate and draw level bar fill
+        const levelProgressWidth = Math.floor((userData.xp / userData.xpNeeded) * LEVEL_BAR_WIDTH);
+        if (levelProgressWidth > 0) {
+            const barFill = new Jimp(levelProgressWidth, LEVEL_BAR_HEIGHT, LEVEL_BAR_COLOR_FILLED);
+            const fillMask = createRoundedMask(levelProgressWidth, LEVEL_BAR_HEIGHT, LEVEL_BAR_CORNER_RADIUS);
+            barFill.mask(fillMask, 0, 0);
+            image.composite(barFill, levelBarX, levelBarY);
         }
-        // Add thin border
-        image.scan(0, 0, cardWidth, cardHeight, function(x, y, idx) {
-            if (x < 2 || y < 2 || x >= cardWidth - 2 || y >= cardHeight - 2) {
-                this.setPixelColor(0x7289daff, x, y); // Discord blue border
-            }
-        });
-        // Save the profile card
+        
+        // Add XP text centered below the bar
+        const xpText = `${xp}/${xpNeeded} XP`;
+        const xpTextWidth = Jimp.measureText(fontNormal16, xpText);
+        image.print(fontNormal16, levelBarX + (LEVEL_BAR_WIDTH - xpTextWidth) / 2, levelBarY + LEVEL_BAR_HEIGHT + 5, xpText);
+        
+        // Save the generated image
         await image.writeAsync(outputPath);
+        
         // Clean up old files
         cleanupTempFiles(outputDir);
+        
         return {
-            path: outputPath
+            path: outputPath,
         };
     } catch (error) {
         console.error('Error creating profile card:', error);

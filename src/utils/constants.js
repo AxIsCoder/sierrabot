@@ -5,7 +5,8 @@ module.exports = {
         UTILITY: 'utility',
         INFO: 'info',
         MODERATION: 'moderation',
-        FUN: 'fun'
+        FUN: 'fun',
+        LEVELING: 'leveling'
     },
     
     // Category display names
@@ -13,7 +14,8 @@ module.exports = {
         utility: 'Utility',
         info: 'Information',
         moderation: 'Moderation',
-        fun: 'Fun & Games'
+        fun: 'Fun & Games',
+        leveling: 'Leveling'
     },
     
     // Category emojis
@@ -21,7 +23,8 @@ module.exports = {
         utility: '🛠️',
         info: 'ℹ️',
         moderation: '🔨',
-        fun: '🎮'
+        fun: '🎮',
+        leveling: '📊'
     },
     
     // Bot information

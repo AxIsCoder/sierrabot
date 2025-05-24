@@ -11,7 +11,7 @@ module.exports = {
             option.setName('user')
                 .setDescription('The user to check stats for (defaults to yourself)')
                 .setRequired(false)),
-    category: CATEGORIES.FUN,
+    category: CATEGORIES.LEVELING,
     async execute(interaction) {
         try {
             // Get current guild ID

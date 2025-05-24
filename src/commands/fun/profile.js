@@ -2,6 +2,7 @@ const { SlashCommandBuilder, AttachmentBuilder } = require('discord.js');
 const { createProfileCard } = require('../../utils/imageManipulator');
 const { getUserStats, getTopUsers } = require('../../utils/messageTracker');
 const { CATEGORIES } = require('../../utils/constants');
+const { getUserLevel, getXpForNextLevel } = require('../../utils/levelingUtils'); // Import leveling utilities
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -37,9 +38,21 @@ module.exports = {
                 });
             }
             
-            // Get top users to find rank
-            const allUsers = getTopUsers(guildId, 1000); // Get all users
-            const userRank = allUsers.findIndex(user => user.id === targetUser.id) + 1;
+            // Get top users to find rank (for message rank)
+            const allMessageUsers = getTopUsers(guildId, 1000); // Get all users for message rank
+            const messageRank = allMessageUsers.findIndex(user => user.id === targetUser.id) + 1;
+
+            // Get user leveling data
+            const userLevelData = getUserLevel(guildId, targetUser.id);
+            const { xp, level } = userLevelData;
+            const xpNeededForNextLevel = getXpForNextLevel(level);
+
+            // Calculate progress for the level bar
+            const levelProgress = xp / xpNeededForNextLevel;
+            const progressBarLength = 20; // Length of the text-based progress bar
+            const filledBar = '█'.repeat(Math.round(levelProgress * progressBarLength));
+            const emptyBar = ' '.repeat(progressBarLength - filledBar.length);
+            const levelBar = `[${filledBar}${emptyBar}] ${Math.round(levelProgress * 100)}%`;
             
             // Format last message time
             const lastMessageDate = new Date(stats.lastMessage);
@@ -57,12 +70,15 @@ module.exports = {
                 console.error('Error fetching member:', err);
             }
             
-            // User data for profile card
+            // User data for profile card (you would integrate level data here for the image version)
             const userData = {
                 username: targetUser.username,
-                rank: userRank,
+                messageRank: messageRank, // Renamed from rank to messageRank for clarity
                 messages: stats.guildMessages,
-                joined: joinedDate
+                joined: joinedDate,
+                level: level, // Add level data
+                xp: xp, // Add xp data
+                xpNeeded: xpNeededForNextLevel // Add xp needed data
             };
             
             try {
@@ -79,26 +95,32 @@ module.exports = {
                     });
                 }
                 
-                // Generate the profile card
-                const result = await createProfileCard(avatarURL, userData);
+                // Generate the profile card (you would need to modify createProfileCard to accept and use level data for the bar)
+                 const result = await createProfileCard(avatarURL, userData);
                 
-                // Create attachment from profile card
-                const attachment = new AttachmentBuilder(result.path, { name: 'profile.png' });
-                
-                // Send the response with the profile card
-                await interaction.editReply({
-                    files: [attachment]
-                });
+                // For now, we'll use the text fallback with the level bar
+                 // const fallbackText =
+                 //    `**${targetUser.tag}'s Profile**\n\n` +
+                 //    `Level: **${level}**\n` +
+                 //    `XP: **${xp}** / **${xpNeeded}**\n` +
+                 //    `Progress: ${levelBar}\n\n` +
+                 //    `Message Rank: #${messageRank}\n` +
+                 //    `Messages Sent: ${stats.guildMessages}\n` +
+                 //    (joinedDate ? `Joined Server: ${joinedDate}\n` : '') +
+                 //    `Last Active: ${lastActive}`;
+
+                 // await interaction.editReply({ content: fallbackText }); // Comment out this line
+
+                // If you modify createProfileCard, uncomment the following and comment out the fallback text block:
+                 const attachment = new AttachmentBuilder(result.path, { name: 'profile.png' }); // Uncomment this line
+                 await interaction.editReply({ files: [attachment] }); // Uncomment this line
+
             } catch (imageError) {
-                console.error('Error creating profile card:', imageError);
+                console.error('Error creating profile card or fallback:', imageError); // Log fallback error as well
                 
-                // Fallback with text if the processing fails
+                // Final fallback if everything fails
                 await interaction.editReply({
-                    content: `**${targetUser.username}'s Profile**\n` +
-                             `Rank: #${userRank}\n` +
-                             `Messages: ${stats.guildMessages}\n` +
-                             (joinedDate ? `Joined: ${joinedDate}\n` : '') +
-                             `Last Active: ${lastActive}`
+                    content: '❌ An error occurred while generating the profile information. Please try again later.'
                 });
             }
         } catch (error) {
@@ -107,11 +129,11 @@ module.exports = {
             // If already deferred, edit the reply
             if (interaction.deferred) {
                 await interaction.editReply({
-                    content: '❌ There was an error generating the profile card. Please try again later.'
+                    content: '❌ There was an error processing your profile request. Please try again later.'
                 });
             } else {
                 await interaction.reply({
-                    content: '❌ There was an error generating the profile card. Please try again later.',
+                    content: '❌ There was an error processing your profile request. Please try again later.',
                     ephemeral: true
                 });
             }
