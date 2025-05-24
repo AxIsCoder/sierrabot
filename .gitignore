@@ -68,6 +68,7 @@ Desktop.ini
 src/data/messages/
 src/data/warnings/
 src/data/reminders/
+src/data/levels/
 
 # Ticket configs (contains guild/channel/role IDs)
 src/data/ticketconfig/ 

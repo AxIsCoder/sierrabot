@@ -40,11 +40,19 @@ A modern Discord bot with beautiful Discord-themed embeds that blend perfectly w
 - **Distort** - Apply amusing distortion effects to user profile pictures
 - **Messages** - View your message statistics and rank
 - **Leaderboard** - See the top message senders in the server
-- **Profile** - Generate a visual profile card with your stats
+- **Profile** - Generate a visual profile card with your stats and level progress
 - **Meme** - Create a meme with custom text
 - **Filter** - Apply filters to a user's profile picture
 - **RPS** - Play Rock Paper Scissors against the bot
 - **GIF** - Get a random GIF based on a tag
+
+### 🎯 Leveling System
+- **Automatic XP** - Gain XP by chatting in the server
+- **Level Progress** - Visual level progress bar in profile cards
+- **Level Up Notifications** - Temporary level-up announcements
+- **Server-specific Levels** - Separate level tracking for each server
+- **XP Cooldown** - Prevent XP farming with message cooldown
+- **Level Leaderboard** - Compare levels with other server members
 
 ## 📋 Prerequisites
 
@@ -224,7 +232,10 @@ src/
 │   └── messageTracker.js
 ├── data/          📊
 │   ├── messages/  # Message statistics
-│   └── warnings/  # Warning records
+│   ├── warnings/  # Warning records
+│   ├── reminders/ # Reminder data
+│   ├── levels/    # Leveling system data
+│   └── ticketconfig/ # Ticket system configuration
 ├── index.js
 └── deploy-commands.js
 ```
