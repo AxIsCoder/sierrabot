@@ -11,6 +11,7 @@ A modern Discord bot with beautiful Discord-themed embeds that blend perfectly w
 - **Poll** - Create interactive polls with reaction voting
 - **Remind** - Set personal reminders for later
 - **Role** - Complete role management tools
+- **Reset** - Reset various server statistics (Admin only)
 
 ### ℹ️ Information Commands
 - **Server Info** - Comprehensive server details with formatted timestamps
@@ -40,6 +41,10 @@ A modern Discord bot with beautiful Discord-themed embeds that blend perfectly w
 - **Messages** - View your message statistics and rank
 - **Leaderboard** - See the top message senders in the server
 - **Profile** - Generate a visual profile card with your stats
+- **Meme** - Create a meme with custom text
+- **Filter** - Apply filters to a user's profile picture
+- **RPS** - Play Rock Paper Scissors against the bot
+- **GIF** - Get a random GIF based on a tag
 
 ## 📋 Prerequisites
 
@@ -123,6 +128,7 @@ Below is a complete reference of all available commands organized by category:
 | `/role add` | Add a role to a user | `/role add user:[user] role:[role] reason:[reason]` | `/role add user:@username role:Member reason:Passed verification` |
 | `/role remove` | Remove a role from a user | `/role remove user:[user] role:[role] reason:[reason]` | `/role remove user:@username role:Member reason:No longer active` |
 | `/role info` | Get information about a role | `/role info role:[role]` | `/role info role:Admin` |
+| `/reset` | Reset various server statistics (Admin only) | `/reset type:[type]` | `/reset type:leaderboard` |
 
 ### ℹ️ Information Commands
 
@@ -161,6 +167,10 @@ Below is a complete reference of all available commands organized by category:
 | `/messages` | View your message statistics | `/messages user:[user]` | `/messages user:@username` |
 | `/leaderboard` | View server message leaderboard | `/leaderboard limit:[1-25]` | `/leaderboard limit:10` |
 | `/profile` | Generate a visual profile card | `/profile user:[user]` | `/profile user:@username` |
+| `/meme` | Create a meme with custom text | `/meme user:[user] top:[text] bottom:[text]` | `/meme user:@username top:Hello bottom:World` |
+| `/filter` | Apply filters to a user's profile picture | `/filter user:[user] filter:[filter]` | `/filter user:@username filter:sepia` |
+| `/rps` | Play Rock Paper Scissors against the bot | `/rps choice:[rock|paper|scissors]` | `/rps choice:rock` |
+| `/gif` | Get a random GIF based on a tag | `/gif tag:[tag]` | `/gif tag:cat` |
 
 ## 📁 Command Structure
 
@@ -201,7 +211,11 @@ src/
 │       ├── distort.js
 │       ├── messages.js
 │       ├── leaderboard.js
-│       └── profile.js
+│       ├── profile.js
+│       ├── meme.js
+│       ├── filter.js
+│       ├── rps.js
+│       └── gif.js
 ├── utils/          🔧
 │   ├── embedCreator.js
 │   ├── constants.js
