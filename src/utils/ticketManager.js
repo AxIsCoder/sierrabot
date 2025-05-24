@@ -13,8 +13,12 @@ async function handleTicketButtonInteraction(interaction) {
         // Note: We now expect the interaction to already be replied to from the interactionCreate handler
         
         // Check if the ticket system is configured for this guild
+        const configDir = path.join(__dirname, '..', 'data', 'ticketconfig');
+        if (!fs.existsSync(configDir)) {
+            fs.mkdirSync(configDir, { recursive: true });
+        }
         const configPath = path.join(
-            __dirname, '..', 'config', 
+            configDir,
             `ticket-config-${interaction.guild.id}.json`
         );
         
@@ -445,7 +449,7 @@ async function createTicket(interaction, config) {
     
     // Save the updated config with the new ticket number
     fs.writeFileSync(
-        path.join(__dirname, '..', 'config', `ticket-config-${interaction.guild.id}.json`),
+        path.join(__dirname, '..', 'data', 'ticketconfig', `ticket-config-${interaction.guild.id}.json`),
         JSON.stringify(config, null, 2)
     );
     

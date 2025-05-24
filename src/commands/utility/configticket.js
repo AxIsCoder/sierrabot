@@ -118,7 +118,7 @@ async function setupTicketSystem(interaction) {
         }
         
         // Create config directory if it doesn't exist
-        const configDir = path.join(__dirname, '..', '..', 'config');
+        const configDir = path.join(__dirname, '..', '..', 'data', 'ticketconfig');
         if (!fs.existsSync(configDir)) {
             fs.mkdirSync(configDir, { recursive: true });
         }
@@ -220,7 +220,7 @@ async function sendTicketEmbed(interaction) {
     try {
         // Check if the ticket system has been configured
         const configPath = path.join(
-            __dirname, '..', '..', 'config', 
+            __dirname, '..', '..', 'data', 'ticketconfig', 
             `ticket-config-${interaction.guild.id}.json`
         );
         
@@ -321,7 +321,7 @@ async function addSupportRole(interaction) {
         
         // Get the configuration file path
         const configPath = path.join(
-            __dirname, '..', '..', 'config', 
+            __dirname, '..', '..', 'data', 'ticketconfig', 
             `ticket-config-${interaction.guild.id}.json`
         );
         
@@ -402,7 +402,7 @@ async function removeSupportRole(interaction) {
         
         // Get the configuration file path
         const configPath = path.join(
-            __dirname, '..', '..', 'config', 
+            __dirname, '..', '..', 'data', 'ticketconfig', 
             `ticket-config-${interaction.guild.id}.json`
         );
         
@@ -488,7 +488,7 @@ async function listSupportRoles(interaction) {
     try {
         // Get the configuration file path
         const configPath = path.join(
-            __dirname, '..', '..', 'config', 
+            __dirname, '..', '..', 'data', 'ticketconfig', 
             `ticket-config-${interaction.guild.id}.json`
         );
         

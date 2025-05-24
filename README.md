@@ -37,6 +37,9 @@ A modern Discord bot with beautiful Discord-themed embeds that blend perfectly w
 - **Pat** - Pat someone on the head with a GIF from Tenor
 - **Poke** - Poke someone with a GIF from Tenor
 - **Distort** - Apply amusing distortion effects to user profile pictures
+- **Messages** - View your message statistics and rank
+- **Leaderboard** - See the top message senders in the server
+- **Profile** - Generate a visual profile card with your stats
 
 ## 📋 Prerequisites
 
@@ -155,6 +158,9 @@ Below is a complete reference of all available commands organized by category:
 | `/pat` | Pat someone on the head with a GIF | `/pat user:[user] message:[message]` | `/pat user:@username message:Good job!` |
 | `/poke` | Poke someone with a GIF | `/poke user:[user] message:[message]` | `/poke user:@username message:Are you there?` |
 | `/distort` | Distort a user's profile picture | `/distort user:[user] effect:[effect]` | `/distort user:@username effect:bulge` |
+| `/messages` | View your message statistics | `/messages user:[user]` | `/messages user:@username` |
+| `/leaderboard` | View server message leaderboard | `/leaderboard limit:[1-25]` | `/leaderboard limit:10` |
+| `/profile` | Generate a visual profile card | `/profile user:[user]` | `/profile user:@username` |
 
 ## 📁 Command Structure
 
@@ -192,12 +198,19 @@ src/
 │       ├── hug.js
 │       ├── pat.js
 │       ├── poke.js
-│       └── distort.js
+│       ├── distort.js
+│       ├── messages.js
+│       ├── leaderboard.js
+│       └── profile.js
 ├── utils/          🔧
 │   ├── embedCreator.js
 │   ├── constants.js
 │   ├── imageManipulator.js
-│   └── tenorApiHandler.js
+│   ├── tenorApiHandler.js
+│   └── messageTracker.js
+├── data/          📊
+│   ├── messages/  # Message statistics
+│   └── warnings/  # Warning records
 ├── index.js
 └── deploy-commands.js
 ```

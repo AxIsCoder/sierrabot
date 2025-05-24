@@ -62,4 +62,12 @@ src/assets/images/temp/
 # Windows
 Thumbs.db
 ehthumbs.db
-Desktop.ini 
+Desktop.ini
+
+# Bot data directories
+src/data/messages/
+src/data/warnings/
+src/data/reminders/
+
+# Ticket configs (contains guild/channel/role IDs)
+src/data/ticketconfig/ 
